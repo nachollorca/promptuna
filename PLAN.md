@@ -11,7 +11,7 @@ In the future, we may introduce unbounded scales (e.g., `max=None`) which would 
 The architecture separates concerns into five primary layers:
 1. **Measurement Scales (`scale.py`)**: Defines the nature of the values a metric can take, how to validate them, and how to normalize them.
 2. **Scorers (`scorer.py`)**: Defines *how* the score is extracted (e.g., using an LLM judge or a deterministic Python function).
-3. **Metrics (`metric.py`)**: Defines *what* is being measured (name, description, scale), orchestrates the evaluation execution via composition with a `Scorer`, and specifies whether the evaluation requires a reference.
+3. **Metrics (`metric.py`)**: Defines *what* is being measured (name, description, scale), orchestrates the evaluation execution via composition with a `Scale` and a `Scorer`, and specifies whether the evaluation requires a reference.
 4. **Datasets (`dataset.py`)**: Defines the examples that feed the target function and the optional expected outputs used for evaluation.
 5. **Task Orchestration (`task.py`)**: The execution engine that binds datasets, target functions (using `lmdk`), and metrics to automate the evaluation loop.
 
@@ -38,18 +38,18 @@ class Scale(ABC):
 
 To leave no room for interpretation, the scales map directly to statistical terminology:
 
-*   **`Binary(Scale)`**:
-    *   **Description**: A variable that can only take one of two mutually exclusive values (e.g., `True/False`, `Pass/Fail`).
-    *   **Normalization**: Maps to `0.0` or `1.0`.
-*   **`Ordinal(Scale)`**:
-    *   **Description**: Categorical variables with a clear, defined order but unknown exact distances between them (e.g., `["Terrible", "Acceptable", "Perfect"]`).
-    *   **Normalization**: Based on index position `index / (len(categories) - 1)`.
-*   **`Discrete(Scale)`**:
-    *   **Description**: A set of fixed, evenly spaced numerical values (e.g., Likert scales represented as `[1, 2, 3, 4, 5]`). 
-    *   **Normalization**: `(value - min) / (max - min)`.
-*   **`Continuous(Scale)`**:
-    *   **Description**: A continuous numerical range with a meaningful zero and exact distances (e.g., exact bounds like `min=0.0, max=1.0`).
-    *   **Normalization**: `(value - min) / (max - min)`.
+- **`Binary(Scale)`**:
+  - **Description**: A variable that can only take one of two mutually exclusive values (e.g., `True/False`, `Pass/Fail`).
+  - **Normalization**: Maps to `0.0` or `1.0`.
+- `Ordinal(Scale)`**:
+  - **Description**: Categorical variables with a clear, defined order but unknown exact distances between them (e.g., `["Terrible", "Acceptable", "Perfect"]`).
+  - **Normalization**: Based on index position `index / (len(categories) - 1)`.
+- **`Discrete(Scale)`**:
+  - **Description**: A set of fixed, evenly spaced numerical values (e.g., Likert scales represented as `[1, 2, 3, 4, 5]`). 
+  - **Normalization**: `(value - min) / (max - min)`.
+- **`Continuous(Scale)`**:
+  - **Description**: A continuous numerical range with a meaningful zero and exact distances (e.g., exact bounds like `min=0.0, max=1.0`).
+  - **Normalization**: `(value - min) / (max - min)`.
 
 
 ---
@@ -61,11 +61,11 @@ To cleanly separate scoring execution from the metric definition, scorers are im
 ### The `Score` Entity
 A simple structure encapsulating the evaluation result:
 *   `value`: The raw measured value.
-*   `reasoning`: Optional explanation for the score (typically provided by an LLM).
+*   `reasoning`: Optional explanation for the score (typically provided by an LLM, but also fillable by a deterministc python function scorer).
 *   `normalized`: The `[0, 1]` normalized score, populated by the `Metric` using the `Scale`.
 
 ### Scorer Types
-*   **`StochasticScorer`**: Leverages an LLM judge. It provides a default prompt template (which users can override) that incorporates the `output`, optional `reference`, optional `inputs`/`example`, optional `original_prompt` (the contextual instruction/prompt given to the target LLM), and the scale instructions. Because LLM judges are themselves stochastic, it supports `judge_repetitions: int = 1`, allowing the same output to be judged multiple times. The repeated judge scores are retained individually and aggregated by the metric/task layer.
+*   **`StochasticScorer`**: Leverages an LLM judge. It provides a default prompt template (which users can override) that incorporates the `output`, optional `reference`, optional `inputs` or the `original_prompt` (the contextual instruction/prompt given to the target LLM), and the scale instructions. Because LLM judges are themselves stochastic, it supports `judge_repetitions: int = 1`, allowing the same output to be judged multiple times. The repeated judge scores are retained individually and aggregated by the metric/task layer.
 *   **`DeterministicScorer`**: Executes a custom Python function (e.g., regex matching, string length, heuristics). It does not provide a default; the user must explicitly pass the scoring function.
 
 ---
