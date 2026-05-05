@@ -111,6 +111,8 @@ The MVP may mutate the returned `Score` or return a new populated `Score`, but t
 
 The MVP needs a stable per-example/per-metric record shape so debugging, aggregation, and future repetition support can be added without changing the public contract.
 
+`EvaluationRecord` carries the full `Score` object rather than unpacking its fields. This preserves the cohesion of `Score` (raw value, reasoning, and normalized value travel together by definition) and keeps the schema extension-friendly: when repeated target/judge executions are added later, the `score` field can evolve to hold multiple `Score` instances (or a record-level reduction of them) without renaming or restructuring the rest of the record.
+
 ```python
 @dataclass
 class EvaluationRecord:
@@ -120,9 +122,7 @@ class EvaluationRecord:
     judge_repetition: int
 
     output: Any | None
-    raw_score: Any | None
-    normalized_score: float | None
-    reasoning: str | None
+    score: Score | None
 
     error_stage: Literal["target", "scorer", "validation", "metric"] | None = None
     error_message: str | None = None
@@ -137,12 +137,12 @@ Fields:
 - `target_repetition`: Always `0` in the MVP. Reserved for repeated target executions.
 - `judge_repetition`: Always `0` in the MVP. Reserved for repeated LLM-judge evaluations.
 - `output`: Extracted `CompletionResponse.output` from the target, if target execution succeeded.
-- `raw_score`: Raw score value returned by the scorer, if scoring succeeded.
-- `normalized_score`: Validated `[0, 1]` score, if validation and normalization succeeded.
-- `reasoning`: Optional scorer explanation.
+- `score`: The `Score` produced by the metric for this (example, metric, repetition) cell. `None` if the record errored before a score could be produced. When present, `score.normalized` is guaranteed to be a valid `[0, 1]` float.
 - `error_stage`: Stage at which the record failed, if any.
 - `error_message`: Human-readable failure details.
 - `example_metadata`: Copied from `Example.metadata` for grouping and reporting.
+
+Invariant: a record has either `score is not None and error_stage is None` (success) or `score is None and error_stage is not None` (failure). There is no partial state.
 
 Error stages:
 
@@ -151,31 +151,56 @@ Error stages:
 - `"validation"`: Scorer returned a value that does not belong to the metric scale.
 - `"metric"`: Metric configuration/data issue, such as a missing required reference.
 
-For failed records, unavailable score fields should be `None`. The harness should continue evaluating remaining examples and metrics after record-level failures.
+For failed records, `score` is `None`. The harness should continue evaluating remaining examples and metrics after record-level failures.
 
-### 3.4 Aggregate Summaries (`result.py` or `aggregation.py`)
+### 3.4 Aggregation Layers and Summary Types (`result.py` or `aggregation.py`)
 
-MVP aggregation is metric-level mean normalized score.
+Aggregation in this harness happens along **three explicit reduction axes**. Each axis has its own type, and the type name itself signals the scope of the number it carries. This makes it unambiguous, at the call site, which aggregation a given value represents.
+
+| Layer | Type             | Scope                                  | Reduces over            | MVP behavior                          |
+| ----- | ---------------- | -------------------------------------- | ----------------------- | ------------------------------------- |
+| 0     | `Score`          | one (example, metric, repetition) cell | nothing                 | one observation                       |
+| 1     | `EvaluationRecord` | one (example, metric) row            | repetitions             | identity: holds the single `Score`    |
+| 2     | `MetricSummary`  | one metric, full dataset               | examples (records)      | mean of `record.score.normalized`     |
+| 3     | `RunSummary`     | one run, full dataset                  | metrics                 | mean of `MetricSummary.mean_score`    |
+
+Layer 1 is currently degenerate (one `Score` per record because both repetitions are pinned to `0`), but it is named explicitly so that future repetition support has an obvious place to live: the per-record reduction will produce a single representative `Score` from many, without changing layers 2 or 3.
+
+All summary types use the field name `mean_score` for the headline `[0, 1]` value. Because the surrounding type already encodes the scope (`MetricSummary.mean_score` vs `RunSummary.mean_score`), no axis-specific prefix is needed.
 
 ```python
 @dataclass
 class MetricSummary:
     metric_name: str
-    mean_normalized_score: float | None
+    mean_score: float | None   # mean over examples, for this metric
     n_success: int
     n_errors: int
+
+@dataclass
+class RunSummary:
+    mean_score: float | None   # mean over metrics, for this run
+    n_metrics: int             # metrics with at least one successful record
+    n_metrics_empty: int       # metrics with no successful records
 ```
 
-Errored records are ignored when computing `mean_normalized_score`, but counted in `n_errors`. If a metric has no successful records, `mean_normalized_score` is `None`.
+Rules:
 
-A convenient task return value can group records and summaries:
+- Errored records are excluded from `MetricSummary.mean_score` but counted in `n_errors`.
+- A metric with no successful records has `MetricSummary.mean_score = None` and contributes to `RunSummary.n_metrics_empty`, not to `RunSummary.mean_score`.
+- `RunSummary.mean_score` is the unweighted arithmetic mean of the non-`None` `MetricSummary.mean_score` values. If every metric is empty, it is `None`.
+- Weighted run-level aggregation (e.g. by `n_success`) is deferred to future work.
+
+The task return value bundles all three layers:
 
 ```python
 @dataclass
 class EvaluationResult:
-    records: list[EvaluationRecord]
-    summaries: list[MetricSummary]
+    records: list[EvaluationRecord]   # layer 1
+    metrics: list[MetricSummary]      # layer 2
+    run: RunSummary                   # layer 3
 ```
+
+The `metrics` and `run` fields are caches of the canonical pure functions `summarize_metrics(records)` and `summarize_run(metric_summaries)` defined in §8. Callers who want custom aggregations should re-run those functions (or their own) over `records`.
 
 ---
 
@@ -484,41 +509,46 @@ Failure mapping:
 
 ### 7.5 Task Return Value
 
-The task should return both raw records and aggregate summaries:
+The task should return raw records along with both summary layers:
 
 ```python
-EvaluationResult(
+metric_summaries = summarize_metrics(records)
+run_summary = summarize_run(metric_summaries)
+return EvaluationResult(
     records=records,
-    summaries=summarize(records),
+    metrics=metric_summaries,
+    run=run_summary,
 )
 ```
 
-This keeps debugging data and high-level reporting together while still allowing callers to recompute custom aggregations.
+This keeps debugging data (layer 1), per-metric reporting (layer 2), and the single-number run headline (layer 3) together, while still allowing callers to recompute custom aggregations directly from `records`.
 
 ---
 
 ## 8. Aggregation
 
-Aggregation operates on `EvaluationRecord` objects and should not depend on target functions, datasets, metrics, or scorers.
+Aggregation operates on `EvaluationRecord` objects (and on the layer-2 outputs) and should not depend on target functions, datasets, metrics, or scorers. It is exposed as two pure functions, one per reduction axis above layer 1:
 
-MVP aggregation groups records by `metric_name` and computes:
+### 8.1 Layer 2 — `summarize_metrics`: reduce examples per metric
 
-- `n_success`: number of records with `normalized_score is not None` and no error
+Groups records by `metric_name` and computes, per metric:
+
+- `n_success`: number of records with `score is not None` and `error_stage is None`
 - `n_errors`: number of records with `error_stage is not None`
-- `mean_normalized_score`: arithmetic mean of successful normalized scores, or `None` if there are no successes
+- `mean_score`: arithmetic mean of `record.score.normalized` over successful records, or `None` if there are no successes
 
-Pseudo-code:
+By the §3.3 invariant, `n_success + n_errors` equals the number of records for that metric.
 
 ```python
-def summarize(records: Sequence[EvaluationRecord]) -> list[MetricSummary]:
+def summarize_metrics(records: Sequence[EvaluationRecord]) -> list[MetricSummary]:
     summaries = []
     for metric_name, group in group_by_metric(records):
-        successes = [r.normalized_score for r in group if r.error_stage is None and r.normalized_score is not None]
+        successes = [r.score.normalized for r in group if r.error_stage is None]
         errors = [r for r in group if r.error_stage is not None]
         summaries.append(
             MetricSummary(
                 metric_name=metric_name,
-                mean_normalized_score=mean(successes) if successes else None,
+                mean_score=mean(successes) if successes else None,
                 n_success=len(successes),
                 n_errors=len(errors),
             )
@@ -526,184 +556,32 @@ def summarize(records: Sequence[EvaluationRecord]) -> list[MetricSummary]:
     return summaries
 ```
 
-Later aggregation can add variance, confidence intervals, per-metadata breakdowns, and repetition-aware summaries without changing `EvaluationRecord`.
+### 8.2 Layer 3 — `summarize_run`: reduce metrics per run
+
+Reduces a list of `MetricSummary` into a single `RunSummary`. Empty metrics (those with `mean_score is None`) are excluded from the mean but counted separately.
+
+```python
+def summarize_run(metric_summaries: Sequence[MetricSummary]) -> RunSummary:
+    non_empty = [m.mean_score for m in metric_summaries if m.mean_score is not None]
+    return RunSummary(
+        mean_score=mean(non_empty) if non_empty else None,
+        n_metrics=len(non_empty),
+        n_metrics_empty=len(metric_summaries) - len(non_empty),
+    )
+```
+
+### 8.3 Future extensions
+
+Later aggregation can add variance, confidence intervals, per-metadata breakdowns, weighted run aggregation, and repetition-aware reductions at layer 1 — all without changing `EvaluationRecord`'s public shape, because `record.score` already wraps the full `Score` and can be generalized to hold reduced multi-repetition data.
 
 ---
 
 ## 9. Ordered Implementation Plan
 
-### Step 1: Create the package skeleton
-
-Create the initial module files:
-
-```text
-eh/
-  __init__.py
-  dataset.py
-  result.py
-  scale.py
-  scorer.py
-  metric.py
-  task.py
-```
-
-If tests exist or will be added immediately, mirror these modules under the test directory.
-
-### Step 2: Implement core data contracts
-
-Implement:
-
-- `Example` in `dataset.py`
-- `Score` in `result.py`
-- `EvaluationRecord` in `result.py`
-- `MetricSummary` in `result.py`
-- `EvaluationResult` in `result.py`
-
-Add basic tests for construction, defaults, and immutability where expected.
-
-### Step 3: Implement scales
-
-Implement:
-
-- base `Scale`
-- `Binary`
-- `Ordinal`
-- `Discrete`
-- `Continuous`
-
-Test each scale for:
-
-- valid values
-- invalid values
-- normalization boundaries
-- midpoint normalization where applicable
-- prompt formatting
-- invalid constructor arguments, such as empty categories or equal min/max bounds
-
-This layer should have no dependency on `lmdk`.
-
-### Step 4: Implement scorer interfaces and deterministic scorer
-
-Implement:
-
-- `Scorer` protocol or abstract base class
-- `DeterministicScorer`
-
-Test that deterministic scorers:
-
-- call the provided function with expected arguments
-- return `Score`
-- propagate or wrap exceptions in a way `Task` can map to `error_stage="scorer"`
-
-At this stage, avoid implementing `StochasticScorer` unless needed immediately. Deterministic scoring is enough to validate the metric and task pipeline.
-
-### Step 5: Implement metrics
-
-Implement `Metric.evaluate(...)` with:
-
-- reference requirement checks
-- scorer invocation
-- scale validation
-- scale normalization
-- populated `Score.normalized`
-- clear exception types or error signals for missing references, scorer errors, and validation errors
-
-Test with deterministic scorers first.
-
-### Step 6: Implement aggregation
-
-Implement `summarize(records)` using `EvaluationRecord` and `MetricSummary`.
-
-Test:
-
-- normal successful records
-- mixed success/error records
-- all-error metrics
-- multiple metrics
-- records with `normalized_score=None`
-
-### Step 7: Implement task orchestration for deterministic metrics
-
-Implement `Task` and `Task.run()` for the basic path:
-
-- iterate examples
-- call target as `target(**example.inputs)`
-- require non-streaming `lmdk.CompletionResponse`
-- require `response.request is not None`
-- extract `output`, `original_prompt`, and `system_instruction`
-- run each metric
-- produce `EvaluationRecord` objects
-- continue after record-level failures
-- return `EvaluationResult(records=..., summaries=...)`
-
-Test this with fake or lightweight `CompletionResponse` objects if possible, or with minimal `lmdk` calls if necessary.
-
-### Step 8: Harden task error handling
-
-Add tests for:
-
-- target raises
-- target returns wrong type
-- target returns `CompletionResponse` without request metadata
-- metric missing required reference
-- scorer raises
-- scorer returns invalid scale value
-- one metric fails while another succeeds
-- one example fails while later examples still run
-
-Ensure target failures produce one errored record per metric.
-
-### Step 9: Implement stochastic scorer
-
-Implement `StochasticScorer` using `lmdk.complete(..., output_schema=...)`.
-
-Include:
-
-- structured judge output schema with `value` and `reasoning`
-- default prompt template
-- optional user-provided prompt template
-- model/provider configuration as required by `lmdk`
-- conversion from judge response to `Score`
-
-Test with mocked `lmdk.complete` first. Add integration tests only if the project supports live model tests.
-
-### Step 10: Add public exports and examples
-
-Update `eh/__init__.py` to export the public API:
-
-- `Example`
-- `Score`
-- `EvaluationRecord`
-- `MetricSummary`
-- `EvaluationResult`
-- scales
-- scorers
-- `Metric`
-- `Task`
-- aggregation helper if public
-
-Add at least one minimal example showing:
-
-- a small dataset
-- a target function returning `CompletionResponse`
-- a deterministic metric
-- task execution
-- printed summaries
-
-Add a second example for `StochasticScorer` if live LLM usage is acceptable.
-
-### Step 11: Documentation and polish
-
-Document:
-
-- target function requirements
-- reference-free vs reference-based metrics
-- scale normalization guarantees
-- error handling semantics
-- MVP limitations
-- future repetition fields
-
-Review names, imports, type hints, and exceptions for API clarity.
+The step-by-step, commit-sized implementation checklist lives in `TODO.md`.
+This document is the design reference; `TODO.md` is the working compass.
+When behavior described here changes, update this file first, then adjust
+`TODO.md` to match.
 
 ---
 
@@ -727,3 +605,4 @@ The following should remain out of the MVP unless needed by immediate users:
 - custom aggregation plugins
 
 The MVP schema already reserves `target_repetition` and `judge_repetition`, so repeated evaluation can be added later without changing the public `EvaluationRecord` shape.
+
