@@ -1,8 +1,8 @@
 # Implementation TODO
 
-This file tracks commit-sized tasks for the MVP described in `PLAN2.md`.
+This file tracks commit-sized tasks for the MVP described in `PLAN.md`.
 Each top-level section is intended to land as a single commit. Check items
-off as you go. If something deviates from `PLAN2.md`, update the plan first.
+off as you go. If something deviates from `PLAN.md`, update the plan first.
 
 Conventions:
 - Package lives under `src/lmeh/` (already scaffolded).
@@ -31,14 +31,17 @@ Conventions:
 - [ ] `dataset.py`: implement `Example` (frozen dataclass) per §3.1.
 - [ ] `result.py`:
   - [ ] `Score` (mutable; `normalized` may be set by `Metric.evaluate`).
-  - [ ] `EvaluationRecord` carrying `score: Score | None` (not unpacked).
+  - [ ] `EvaluationError` (frozen dataclass with `stage` + `message`).
+  - [ ] `EvaluationRecord` carrying `example_id`, `metric_name`,
+        `output: Any | None`, `score: Score | None`,
+        `error: EvaluationError | None`, and `example_metadata`
+        (neither `score` nor `error` unpacked).
   - [ ] `MetricSummary`, `RunSummary`, `EvaluationResult`.
 - [ ] Tests:
   - [ ] Construction + defaults for each type.
-  - [ ] `Example` immutability.
-  - [ ] Invariant from §3.3: `score is not None` XOR `error_stage is not None`
+  - [ ] `Example` and `EvaluationError` immutability.
+  - [ ] Invariant from §3.3: exactly one of `score` / `error` is non-`None`
         (enforce via `__post_init__` or a constructor helper).
-  - [ ] `target_repetition` / `judge_repetition` default to `0`.
 
 ## Commit 3 — Measurement scales
 
@@ -64,7 +67,7 @@ Conventions:
   - [ ] User function receives expected kwargs (`output`, `example`,
         `original_prompt`, `system_instruction`).
   - [ ] Returns `Score`.
-  - [ ] Exceptions propagate (so `Task` can map to `error_stage="scorer"`).
+  - [ ] Exceptions propagate (so `Task` can map to `EvaluationError(stage="scorer", ...)`).
 
 ## Commit 5 — Metric
 
@@ -109,14 +112,14 @@ Conventions:
 
 ## Commit 8 — Task error handling
 
-- [ ] Map failures to `error_stage` per §7.4:
+- [ ] Map failures to `EvaluationError(stage=..., message=...)` per §7.4:
   - [ ] target raises / wrong type / streaming / missing `request`
-        → one `error_stage="target"` record per metric, `output=None`,
+        → one record per metric with `stage="target"`, `output=None`,
         `score=None`.
-  - [ ] missing required reference → `error_stage="metric"`.
-  - [ ] scorer raises → `error_stage="scorer"`.
-  - [ ] invalid raw score → `error_stage="validation"`.
-  - [ ] unexpected metric error → `error_stage="metric"`.
+  - [ ] missing required reference → `stage="metric"`.
+  - [ ] scorer raises → `stage="scorer"`.
+  - [ ] invalid raw score → `stage="validation"`.
+  - [ ] unexpected metric error → `stage="metric"`.
 - [ ] One metric failing must not block other metrics for the same example.
 - [ ] One example failing must not stop the run.
 - [ ] Tests for every bullet above.
@@ -141,7 +144,7 @@ Conventions:
 
 - [ ] `src/lmeh/__init__.py` exports:
   - [ ] `Example`
-  - [ ] `Score`, `EvaluationRecord`, `MetricSummary`, `RunSummary`, `EvaluationResult`
+  - [ ] `Score`, `EvaluationError`, `EvaluationRecord`, `MetricSummary`, `RunSummary`, `EvaluationResult`
   - [ ] `Scale`, `Binary`, `Ordinal`, `Discrete`, `Continuous`
   - [ ] `Scorer`, `DeterministicScorer`, `StochasticScorer`
   - [ ] `Metric`
@@ -160,16 +163,16 @@ Conventions:
   - [ ] target function requirements (non-streaming, `request` populated)
   - [ ] reference-free vs reference-based metrics
   - [ ] scale normalization guarantees ([0, 1])
-  - [ ] error handling semantics + `error_stage` taxonomy
-  - [ ] MVP limitations
-  - [ ] reserved `target_repetition` / `judge_repetition` for future work
+  - [ ] error handling semantics + `EvaluationError.stage` taxonomy
+  - [ ] MVP limitations (see PLAN.md §10 for deferred features,
+        including repeated target/judge execution)
 - [ ] Pass: type hints, public names, exceptions, docstrings on public API.
 
 ---
 
 ## Out of scope (do NOT implement in MVP)
 
-Tracked here so they are not picked up accidentally; see PLAN2.md §10.
+Tracked here so they are not picked up accidentally; see PLAN.md §10.
 
 - repeated target/judge executions and repetition-aware aggregation
 - variance / confidence intervals

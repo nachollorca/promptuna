@@ -4,7 +4,7 @@
 
 The goal of this package is to provide an evaluation harness for benchmarking functions that use Large Language Models (LLMs). The harness runs a target function over a dataset, evaluates each output with one or more metrics, records per-example/per-metric results, and computes normalized aggregate scores.
 
-Because both target LLM calls and LLM-based judges may be stochastic, the architecture must preserve enough metadata to support repeated target executions and repeated judge evaluations later. However, the MVP intentionally implements the simplest reliable path first:
+The MVP intentionally implements the simplest reliable path first:
 
 - one target execution per example
 - one scorer execution per metric
@@ -16,7 +16,7 @@ Because both target LLM calls and LLM-based judges may be stochastic, the archit
 
 All metric scores must be normalized to `[0, 1]` so that aggregation across metrics and tasks is meaningful. Therefore, every MVP scale must be bounded and capable of validating and normalizing raw score values.
 
-Future versions may add unbounded scales, repeated target execution, repeated judging, empirical/batch normalization, variance estimates, confidence intervals, richer dataset wrappers, and more advanced reporting. These are intentionally out of scope for the MVP unless explicitly noted as schema-preserving extension points.
+Future versions may add unbounded scales, repeated target execution and repeated judging (to account for the stochastic nature of LMs), empirical/batch normalization, variance estimates, confidence intervals, richer dataset wrappers, and more advanced reporting. These are intentionally out of scope for the MVP unless explicitly noted as schema-preserving extension points.
 
 ---
 
@@ -91,17 +91,25 @@ JSONL maps naturally to this shape:
 
 `Score` is the intermediate score returned by a scorer and then validated/normalized by a metric.
 
+The MVP commits to bounded scales (§1, §4), and §4.2 enumerates exactly four shapes of legal raw values: `bool` (Binary), `str` (Binary/Ordinal categorical labels), `int` (Discrete), and `float` (Continuous). We capture this directly in the type system as a single alias used by both `Score` and `Scale`:
+
+```python
+ScoreValue = bool | int | float | str
+```
+
+Widening this alias is the explicit extension point for future unbounded or structured scales; until then, scorers cannot silently return arbitrary objects.
+
 ```python
 @dataclass
 class Score:
-    value: Any
+    value: ScoreValue
     reasoning: str | None = None
     normalized: float | None = None
 ```
 
 Fields:
 
-- `value`: Raw score value returned by the scorer.
+- `value`: Raw score value returned by the scorer. Must be a member of `ScoreValue`; the metric's `Scale` decides which subset is actually legal.
 - `reasoning`: Optional explanation, commonly from an LLM judge but also allowed for deterministic scorers.
 - `normalized`: `[0, 1]` normalized score. Scorers should normally leave this as `None`; `Metric.evaluate` populates it after scale validation.
 
@@ -111,21 +119,29 @@ The MVP may mutate the returned `Score` or return a new populated `Score`, but t
 
 The MVP needs a stable per-example/per-metric record shape so debugging, aggregation, and future repetition support can be added without changing the public contract.
 
-`EvaluationRecord` carries the full `Score` object rather than unpacking its fields. This preserves the cohesion of `Score` (raw value, reasoning, and normalized value travel together by definition) and keeps the schema extension-friendly: when repeated target/judge executions are added later, the `score` field can evolve to hold multiple `Score` instances (or a record-level reduction of them) without renaming or restructuring the rest of the record.
+`EvaluationRecord` carries the full `Score` object rather than unpacking its fields. This preserves the cohesion of `Score`: raw value, reasoning, and normalized value travel together by definition, and serializing a single nested object is simpler than keeping three parallel fields in sync.
+
+Failure information is similarly bundled into a small `EvaluationError` dataclass rather than spread across parallel optional fields on the record. This mirrors the treatment of `Score`, collapses the success/failure invariant to a single `error is None` check, and gives later debugging fields (exception type, traceback, originating cause) an obvious home without widening `EvaluationRecord`.
+
+`EvaluationError` is intentionally **not** an `Exception` subclass. Records are persisted data (JSONL, aggregation, cross-run diffs), not control-flow signals; exception machinery (`__traceback__`, `__cause__`, `*args`-based `__init__`) does not serialize cleanly and conflicts with `@dataclass(frozen=True)`. The task layer catches real exceptions at the failure site and converts them into `EvaluationError` values.
 
 ```python
+@dataclass(frozen=True)
+class EvaluationError:
+    stage: Literal["target", "scorer", "validation", "metric"]
+    message: str
+    # Reserved extension points, out of MVP scope:
+    # exception_type: str | None = None
+    # traceback: str | None = None
+
 @dataclass
 class EvaluationRecord:
     example_id: str
     metric_name: str
-    target_repetition: int
-    judge_repetition: int
 
-    output: Any | None
-    score: Score | None
-
-    error_stage: Literal["target", "scorer", "validation", "metric"] | None = None
-    error_message: str | None = None
+    output: Any | None = None
+    score: Score | None = None
+    error: EvaluationError | None = None
 
     example_metadata: Mapping[str, Any] = field(default_factory=dict)
 ```
@@ -134,37 +150,31 @@ Fields:
 
 - `example_id`: ID of the evaluated example.
 - `metric_name`: Stable metric name used for grouping and aggregation.
-- `target_repetition`: Always `0` in the MVP. Reserved for repeated target executions.
-- `judge_repetition`: Always `0` in the MVP. Reserved for repeated LLM-judge evaluations.
 - `output`: Extracted `CompletionResponse.output` from the target, if target execution succeeded.
-- `score`: The `Score` produced by the metric for this (example, metric, repetition) cell. `None` if the record errored before a score could be produced. When present, `score.normalized` is guaranteed to be a valid `[0, 1]` float.
-- `error_stage`: Stage at which the record failed, if any.
-- `error_message`: Human-readable failure details.
+- `score`: The `Score` produced by the metric for this (example, metric) cell. `None` if the record errored before a score could be produced. When present, `score.normalized` is guaranteed to be a valid `[0, 1]` float.
+- `error`: An `EvaluationError` describing the failure, or `None` if the record succeeded.
 - `example_metadata`: Copied from `Example.metadata` for grouping and reporting.
 
-Invariant: a record has either `score is not None and error_stage is None` (success) or `score is None and error_stage is not None` (failure). There is no partial state.
+Invariant: exactly one of `score` and `error` is non-`None`. There is no partial state.
 
-Error stages:
+Error stages (`EvaluationError.stage`):
 
 - `"target"`: Target function raised, returned the wrong type, returned a streaming response, or returned a `CompletionResponse` without request metadata.
 - `"scorer"`: Deterministic scorer or stochastic judge execution failed.
 - `"validation"`: Scorer returned a value that does not belong to the metric scale.
 - `"metric"`: Metric configuration/data issue, such as a missing required reference.
 
-For failed records, `score` is `None`. The harness should continue evaluating remaining examples and metrics after record-level failures.
+For failed records, `score` is `None` and `error` is populated. The harness should continue evaluating remaining examples and metrics after record-level failures.
 
 ### 3.4 Aggregation Layers and Summary Types (`result.py` or `aggregation.py`)
 
-Aggregation in this harness happens along **three explicit reduction axes**. Each axis has its own type, and the type name itself signals the scope of the number it carries. This makes it unambiguous, at the call site, which aggregation a given value represents.
+Aggregation in this harness happens along **two explicit reduction axes** on top of the per-cell record. Each layer has its own type, and the type name itself signals the scope of the number it carries. This makes it unambiguous, at the call site, which aggregation a given value represents.
 
-| Layer | Type             | Scope                                  | Reduces over            | MVP behavior                          |
-| ----- | ---------------- | -------------------------------------- | ----------------------- | ------------------------------------- |
-| 0     | `Score`          | one (example, metric, repetition) cell | nothing                 | one observation                       |
-| 1     | `EvaluationRecord` | one (example, metric) row            | repetitions             | identity: holds the single `Score`    |
-| 2     | `MetricSummary`  | one metric, full dataset               | examples (records)      | mean of `record.score.normalized`     |
-| 3     | `RunSummary`     | one run, full dataset                  | metrics                 | mean of `MetricSummary.mean_score`    |
-
-Layer 1 is currently degenerate (one `Score` per record because both repetitions are pinned to `0`), but it is named explicitly so that future repetition support has an obvious place to live: the per-record reduction will produce a single representative `Score` from many, without changing layers 2 or 3.
+| Layer | Type               | Scope                          | Reduces over       | MVP behavior                          |
+| ----- | ------------------ | ------------------------------ | ------------------ | ------------------------------------- |
+| 0     | `EvaluationRecord` | one (example, metric) cell     | nothing            | holds one `Score`                     |
+| 1     | `MetricSummary`    | one metric, full dataset       | examples (records) | mean of `record.score.normalized`     |
+| 2     | `RunSummary`       | one run, full dataset          | metrics            | mean of `MetricSummary.mean_score`    |
 
 All summary types use the field name `mean_score` for the headline `[0, 1]` value. Because the surrounding type already encodes the scope (`MetricSummary.mean_score` vs `RunSummary.mean_score`), no axis-specific prefix is needed.
 
@@ -195,9 +205,9 @@ The task return value bundles all three layers:
 ```python
 @dataclass
 class EvaluationResult:
-    records: list[EvaluationRecord]   # layer 1
-    metrics: list[MetricSummary]      # layer 2
-    run: RunSummary                   # layer 3
+    records: list[EvaluationRecord]   # layer 0
+    metrics: list[MetricSummary]      # layer 1
+    run: RunSummary                   # layer 2
 ```
 
 The `metrics` and `run` fields are caches of the canonical pure functions `summarize_metrics(records)` and `summarize_run(metric_summaries)` defined in §8. Callers who want custom aggregations should re-run those functions (or their own) over `records`.
@@ -213,10 +223,10 @@ Scales define which raw values are legal for a metric and how legal values norma
 ```python
 class Scale(ABC):
     @abstractmethod
-    def validate(self, value: Any) -> bool: ...
+    def validate(self, value: object) -> bool: ...
 
     @abstractmethod
-    def normalize(self, value: Any) -> float: ...
+    def normalize(self, value: ScoreValue) -> float: ...
 
     @abstractmethod
     def format_for_prompt(self) -> str: ...
@@ -224,13 +234,13 @@ class Scale(ABC):
 
 Expected behavior:
 
-- `validate(value)` returns whether `value` belongs to the scale.
-- `normalize(value)` converts a valid raw value into a float in `[0, 1]`.
+- `validate(value)` returns whether `value` belongs to the scale. It takes `object` (not `Any`) because its job is to vet untrusted input; callers must check the return value before treating `value` as a legal score.
+- `normalize(value)` converts a valid raw value into a float in `[0, 1]`. Its parameter is typed as `ScoreValue` because, by the evaluation flow in §6.2, `normalize` only ever runs after `validate` has returned `True`.
 - `format_for_prompt()` returns judge-facing instructions that describe valid values.
 
 `normalize` may assume the value has already been validated, but defensive implementations are acceptable.
 
-### 4.2 Concrete Scale Implementations
+### 4.2 Concrete Scale ImplementationsIf w
 
 #### `Binary(Scale)`
 
@@ -315,7 +325,7 @@ class Scorer(Protocol):
 
 The scorer receives:
 
-- `output`: Target function output extracted from `CompletionResponse.output`.
+- `output`: Target function output extracted from `CompletionResponse.output`. Typed as `Any` deliberately, mirroring `lmdk.CompletionResponse.output`, which itself varies between a content string, a parsed `BaseModel`, a list of models, or an extracted scalar depending on whether and how a structured output schema was used. Narrowing this type in the harness would misrepresent lmdk's contract.
 - `example`: Full evaluator-side example, including inputs, reference, and metadata.
 - `original_prompt`: Prompt/messages sent by the target to the model, when available.
 - `system_instruction`: System-level instruction sent by the target, when available.
@@ -428,7 +438,7 @@ Examples:
 6. Populate `score.normalized`.
 7. Return the populated `Score`.
 
-Metric-level errors should be distinguishable from scorer execution errors and validation errors so `Task` can produce precise `EvaluationRecord.error_stage` values.
+Metric-level errors should be distinguishable from scorer execution errors and validation errors so `Task` can produce precise `EvaluationError.stage` values.
 
 ---
 
@@ -488,24 +498,20 @@ If target execution fails for an example, the task should still create one error
 
 For target failures:
 
-- `error_stage="target"`
+- `error=EvaluationError(stage="target", message=...)`
 - `output=None`
-- `raw_score=None`
-- `normalized_score=None`
-- `reasoning=None`
-- `target_repetition=0`
-- `judge_repetition=0`
+- `score=None`
 
 ### 7.4 Metric and Scorer Failures
 
 If scoring or metric evaluation fails for one metric, other metrics for the same example should still run when possible.
 
-Failure mapping:
+Failure mapping (the task constructs `EvaluationError(stage=..., message=...)` accordingly):
 
-- missing required reference → `error_stage="metric"`
-- scorer function or LLM judge raises → `error_stage="scorer"`
-- invalid raw score value → `error_stage="validation"`
-- unexpected metric-layer issue → `error_stage="metric"`
+- missing required reference → `stage="metric"`
+- scorer function or LLM judge raises → `stage="scorer"`
+- invalid raw score value → `stage="validation"`
+- unexpected metric-layer issue → `stage="metric"`
 
 ### 7.5 Task Return Value
 
@@ -527,14 +533,14 @@ This keeps debugging data (layer 1), per-metric reporting (layer 2), and the sin
 
 ## 8. Aggregation
 
-Aggregation operates on `EvaluationRecord` objects (and on the layer-2 outputs) and should not depend on target functions, datasets, metrics, or scorers. It is exposed as two pure functions, one per reduction axis above layer 1:
+Aggregation operates on `EvaluationRecord` objects (and on the layer-1 outputs) and should not depend on target functions, datasets, metrics, or scorers. It is exposed as two pure functions, one per reduction axis above the per-cell record:
 
-### 8.1 Layer 2 — `summarize_metrics`: reduce examples per metric
+### 8.1 Layer 1 — `summarize_metrics`: reduce examples per metric
 
 Groups records by `metric_name` and computes, per metric:
 
-- `n_success`: number of records with `score is not None` and `error_stage is None`
-- `n_errors`: number of records with `error_stage is not None`
+- `n_success`: number of records with `score is not None` and `error is None`
+- `n_errors`: number of records with `error is not None`
 - `mean_score`: arithmetic mean of `record.score.normalized` over successful records, or `None` if there are no successes
 
 By the §3.3 invariant, `n_success + n_errors` equals the number of records for that metric.
@@ -543,8 +549,8 @@ By the §3.3 invariant, `n_success + n_errors` equals the number of records for 
 def summarize_metrics(records: Sequence[EvaluationRecord]) -> list[MetricSummary]:
     summaries = []
     for metric_name, group in group_by_metric(records):
-        successes = [r.score.normalized for r in group if r.error_stage is None]
-        errors = [r for r in group if r.error_stage is not None]
+        successes = [r.score.normalized for r in group if r.error is None]
+        errors = [r for r in group if r.error is not None]
         summaries.append(
             MetricSummary(
                 metric_name=metric_name,
@@ -556,7 +562,7 @@ def summarize_metrics(records: Sequence[EvaluationRecord]) -> list[MetricSummary
     return summaries
 ```
 
-### 8.2 Layer 3 — `summarize_run`: reduce metrics per run
+### 8.2 Layer 2 — `summarize_run`: reduce metrics per run
 
 Reduces a list of `MetricSummary` into a single `RunSummary`. Empty metrics (those with `mean_score is None`) are excluded from the mean but counted separately.
 
@@ -572,7 +578,7 @@ def summarize_run(metric_summaries: Sequence[MetricSummary]) -> RunSummary:
 
 ### 8.3 Future extensions
 
-Later aggregation can add variance, confidence intervals, per-metadata breakdowns, weighted run aggregation, and repetition-aware reductions at layer 1 — all without changing `EvaluationRecord`'s public shape, because `record.score` already wraps the full `Score` and can be generalized to hold reduced multi-repetition data.
+Later aggregation can add variance, confidence intervals, per-metadata breakdowns, and weighted run aggregation. Repetition-aware reductions are also possible but are expected to be a schema change (see §10), not a drop-in extension.
 
 ---
 
@@ -604,5 +610,4 @@ The following should remain out of the MVP unless needed by immediate users:
 - target functions that return raw values instead of `CompletionResponse`
 - custom aggregation plugins
 
-The MVP schema already reserves `target_repetition` and `judge_repetition`, so repeated evaluation can be added later without changing the public `EvaluationRecord` shape.
-
+Repeated target/judge execution is deferred. Adding it will likely require evolving `EvaluationRecord.score` to hold multiple observations plus a reduction policy (and probably variance/CI fields on the summaries), and is expected to be a schema change rather than a drop-in extension.
