@@ -51,9 +51,11 @@ class ExperimentConfig:
 class TargetFunction(Protocol):
     """The shape every function under evaluation must follow.
 
-    The implementation may transform ``inputs``, render them into
-    ``prompt_template``, and dispatch the result as a single user message,
-    returning the model's ``CompletionResponse``.
+    The target is the sole owner of prompt rendering: it transforms ``inputs``,
+    renders them into ``prompt_template``, and dispatches the result as a
+    single user message. The harness never re-renders the template; it reads
+    the exact string the target sent back off
+    ``CompletionResponse.completion_request.prompt`` (see ``Trial.rendered_prompt``).
     """
 
     def __call__(
@@ -213,9 +215,20 @@ class Trial:
     """
 
     example: Example
-    rendered_prompt: str
     response: CompletionResponse | None = None
     error: Exception | None = None
+
+    @property
+    def succeeded(self) -> bool:
+        return self.response is not None and self.error is None
+
+    @property
+    def rendered_prompt(self) -> str | None:
+        """The exact prompt the target sent, recovered from the response.
+
+        ``None`` for failed trials, which have no response to inspect.
+        """
+        return self.response.request.prompt if self.response else None
 
 
 @dataclass
@@ -257,6 +270,11 @@ class RunResults:
     @property
     def successful_trials(self) -> list[Trial]:
         return [t for t in self.trials if t.succeeded]
+
+    @property
+    def failure_rate(self) -> float:
+        """Fraction of trials that errored out, in ``[0, 1]``."""
+        return 1.0 - len(self.successful_trials) / len(self.trials) if self.trials else 0.0
 
     @property
     def mean_normalized(self) -> float:
