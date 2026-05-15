@@ -251,7 +251,6 @@ class Metric:
     Args:
         name: Unique identifier used in aggregates.
         description: Human-readable explanation of what is measured.
-        requires_reference: Whether ``Example.reference`` must be present.
         scale: Scale used to validate and normalize raw scores.
         scorer: Callable producing the score; deterministic or LLM-based.
         judge_config: Required for LLM-judge metrics. If present, the harness
@@ -261,7 +260,6 @@ class Metric:
 
     name: str
     description: str
-    requires_reference: bool
     scale: Scale
     scorer: DeterministicScorer | StochasticScorer
     judge_config: JudgeConfig | None = None
@@ -303,11 +301,27 @@ class Trial:
 
 @dataclass
 class MetricResult:
-    """The result of applying one Metric to one Trial."""
+    """The result of applying one Metric to one Trial.
+
+    Exactly one of ``score`` or ``error`` is set:
+
+    - On a successful scoring, ``score`` holds the produced ``Score``. This
+      includes the sentinel zero scores emitted for failed trials (the target
+      is what's under evaluation, so its failures count against it).
+    - On a scorer error (e.g. an LLM judge crashing or returning malformed
+      output), ``error`` holds the exception. These entries are excluded
+      from quality aggregates so a flaky judge does not bias results.
+    """
 
     trial: Trial
     metric: Metric
-    score: Score
+    score: Score | None = None
+    error: Exception | None = None
+
+    @property
+    def succeeded(self) -> bool:
+        """Marks if the scorer produced a score without erroring."""
+        return self.score is not None and self.error is None
 
 
 @dataclass
@@ -327,7 +341,10 @@ class RunResults:
     - ``trials``: one entry per example. Telemetry aggregates (latency,
       output tokens) iterate this list so an example evaluated by N metrics
       is not overcounted.
-    - ``metric_results``: ``|trials| * |metrics|``. Quality aggregates iterate this.
+    - ``metric_results``: one entry per (trial, metric) pair. Failed trials
+      contribute zero scores (the target is what's under evaluation);
+      scorer errors contribute entries with ``error`` set and are excluded
+      from quality aggregates.
 
     Telemetry aggregates skip failed trials (those with no ``response``).
     """
@@ -355,24 +372,39 @@ class RunResults:
         return 1.0 - len(self.successful_trials) / len(self.trials) if self.trials else 0.0
 
     @property
+    def scored_results(self) -> list[MetricResult]:
+        """Metric results that produced a score (excludes scorer errors)."""
+        return [r for r in self.metric_results if r.succeeded]
+
+    @property
     def mean_normalized(self) -> float:
-        """Average normalized score across every metric result."""
-        return _mean(r.score.normalized for r in self.metric_results)
+        """Average normalized score across every successfully scored result."""
+        return _mean(r.score.normalized for r in self.scored_results)  # type: ignore[union-attr]
 
     def per_example(self) -> dict[int, float]:
         """Return mean normalized score per example, keyed by ``id(example)``."""
+        scored = self.scored_results
         return {
-            id(ex): _mean(r.score.normalized for r in self.metric_results if r.trial.example is ex)
-            for ex in {id(r.trial.example): r.trial.example for r in self.metric_results}.values()
+            id(ex): _mean(r.score.normalized for r in scored if r.trial.example is ex)  # type: ignore[union-attr]
+            for ex in {id(r.trial.example): r.trial.example for r in scored}.values()
         }
 
     def per_metric(self) -> dict[str, float]:
         """Return mean normalized score per metric, keyed by metric name."""
-        names = {r.metric.name for r in self.metric_results}
+        scored = self.scored_results
+        names = {r.metric.name for r in scored}
         return {
-            name: _mean(r.score.normalized for r in self.metric_results if r.metric.name == name)
+            name: _mean(r.score.normalized for r in scored if r.metric.name == name)  # type: ignore[union-attr]
             for name in names
         }
+
+    @property
+    def score_failure_rate(self) -> float:
+        """Fraction of metric results where the scorer itself errored, in ``[0, 1]``."""
+        if not self.metric_results:
+            return 0.0
+        errors = sum(1 for r in self.metric_results if r.error is not None)
+        return errors / len(self.metric_results)
 
     @property
     def mean_latency(self) -> float:
