@@ -43,6 +43,7 @@ class Example:
 
 
 Dataset = list[Example]
+"""A dataset is a simple iterator of examples. In the future can contain metadata and splits."""
 
 
 @dataclass
@@ -265,63 +266,75 @@ class Metric:
     judge_config: JudgeConfig | None = None
 
 
-@dataclass
-class Trial:
-    """One execution of an Experiment against one Example.
+@dataclass(frozen=True)
+class SuccessfulTrial:
+    """A trial whose target executed without raising.
 
-    Exactly one of ``result`` or ``error`` is set:
-
-    - On success, ``result`` holds the ``TargetOutput`` returned by the
-      target, so downstream code can read the post-processed output, the raw
-      response, latency, token counts, finish reason, etc., without re-running
-      the target.
-    - On failure, ``error`` holds the exception raised by the target so the
-      run can continue and surface the failure in aggregates.
+    ``result`` carries the post-processed output plus the raw
+    ``CompletionResponse`` (latency, tokens, finish reason, originating
+    request, etc.).
     """
 
     example: Example
-    result: TargetOutput | None = None
-    error: Exception | None = None
+    result: TargetOutput
 
     @property
-    def succeeded(self) -> bool:
-        """Marks if the trial executed without errors."""
-        return self.result is not None and self.error is None
-
-    @property
-    def rendered_prompt(self) -> str | None:
+    def rendered_prompt(self) -> str:
         """The exact user prompt sent by the target.
 
-        The harness assumes targets send exactly one user message. ``None`` for
-        failed trials, which have no response to inspect.
+        The harness assumes targets send exactly one user message.
         """
-        request = self.result.request if self.result else None
-        return request.prompt[0].content if request else None  # We assume just one prompt
+        request = self.result.request
+        assert request is not None, "Successful trial must carry a request"
+        return request.prompt[0].content
 
 
-@dataclass
-class MetricResult:
-    """The result of applying one Metric to one Trial.
+@dataclass(frozen=True)
+class FailedTrial:
+    """A trial whose target raised. ``error`` is surfaced in aggregates."""
 
-    Exactly one of ``score`` or ``error`` is set:
+    example: Example
+    error: Exception
 
-    - On a successful scoring, ``score`` holds the produced ``Score``. This
-      includes the sentinel zero scores emitted for failed trials (the target
-      is what's under evaluation, so its failures count against it).
-    - On a scorer error (e.g. an LLM judge crashing or returning malformed
-      output), ``error`` holds the exception. These entries are excluded
-      from quality aggregates so a flaky judge does not bias results.
+
+Trial = SuccessfulTrial | FailedTrial
+"""One execution of an Experiment against one Example.
+
+A tagged union: pattern-match on ``SuccessfulTrial`` / ``FailedTrial`` (or
+use ``isinstance``) to consume. The target is what's under evaluation, so
+failed trials remain in ``RunResults.trials`` and count against the run.
+"""
+
+
+@dataclass(frozen=True)
+class ScoredResult:
+    """A metric successfully applied to a trial, producing a ``Score``.
+
+    Sentinel zero scores emitted for failed trials also live here: from the
+    scorer's perspective a score was recorded. Callers that want to separate
+    "real" scores from sentinel zeros can check ``isinstance(trial,
+    FailedTrial)``.
     """
 
     trial: Trial
-    metric: Metric
-    score: Score | None = None
-    error: Exception | None = None
+    metric: "Metric"
+    score: Score
 
-    @property
-    def succeeded(self) -> bool:
-        """Marks if the scorer produced a score without erroring."""
-        return self.score is not None and self.error is None
+
+@dataclass(frozen=True)
+class ScoringError:
+    """A scorer crashed (e.g. judge returned malformed output).
+
+    Excluded from quality aggregates so a flaky judge does not bias results.
+    """
+
+    trial: Trial
+    metric: "Metric"
+    error: Exception
+
+
+MetricResult = ScoredResult | ScoringError
+"""The result of applying one Metric to one Trial (tagged union)."""
 
 
 @dataclass
@@ -355,16 +368,14 @@ class RunResults:
     metric_results: list[MetricResult]
 
     @property
-    def successful_trials(self) -> list[Trial]:
+    def successful_trials(self) -> list[SuccessfulTrial]:
         """List of trials executed without errors."""
-        return [t for t in self.trials if t.succeeded]
+        return [t for t in self.trials if isinstance(t, SuccessfulTrial)]
 
     @property
     def successful_responses(self) -> list[CompletionResponse]:
         """Raw LM responses from successful trials."""
-        from typing import cast
-
-        return [cast(TargetOutput, t.result).response for t in self.successful_trials]
+        return [t.result.response for t in self.successful_trials]
 
     @property
     def failure_rate(self) -> float:
@@ -372,20 +383,20 @@ class RunResults:
         return 1.0 - len(self.successful_trials) / len(self.trials) if self.trials else 0.0
 
     @property
-    def scored_results(self) -> list[MetricResult]:
+    def scored_results(self) -> list[ScoredResult]:
         """Metric results that produced a score (excludes scorer errors)."""
-        return [r for r in self.metric_results if r.succeeded]
+        return [r for r in self.metric_results if isinstance(r, ScoredResult)]
 
     @property
     def mean_normalized(self) -> float:
         """Average normalized score across every successfully scored result."""
-        return _mean(r.score.normalized for r in self.scored_results)  # type: ignore[union-attr]
+        return _mean(r.score.normalized for r in self.scored_results)
 
     def per_example(self) -> dict[int, float]:
         """Return mean normalized score per example, keyed by ``id(example)``."""
         scored = self.scored_results
         return {
-            id(ex): _mean(r.score.normalized for r in scored if r.trial.example is ex)  # type: ignore[union-attr]
+            id(ex): _mean(r.score.normalized for r in scored if r.trial.example is ex)
             for ex in {id(r.trial.example): r.trial.example for r in scored}.values()
         }
 
@@ -394,7 +405,7 @@ class RunResults:
         scored = self.scored_results
         names = {r.metric.name for r in scored}
         return {
-            name: _mean(r.score.normalized for r in scored if r.metric.name == name)  # type: ignore[union-attr]
+            name: _mean(r.score.normalized for r in scored if r.metric.name == name)
             for name in names
         }
 
@@ -403,7 +414,7 @@ class RunResults:
         """Fraction of metric results where the scorer itself errored, in ``[0, 1]``."""
         if not self.metric_results:
             return 0.0
-        errors = sum(1 for r in self.metric_results if r.error is not None)
+        errors = sum(1 for r in self.metric_results if isinstance(r, ScoringError))
         return errors / len(self.metric_results)
 
     @property

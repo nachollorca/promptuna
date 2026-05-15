@@ -24,11 +24,11 @@ flowchart LR
 - **Example**: one dataset row. It has `inputs` for the prompt and an optional `reference` answer.
 - **Dataset**: a list of examples.
 - **ExperimentConfig**: the model, prompt template, generation options, and optional structured output schema to test.
-- **TargetFunction**: your model-calling function. It receives an example's inputs plus the experiment config, renders the prompt, calls the model, and returns a `CompletionResponse`.
+- **TargetFunction**: your model-calling function. It receives an example's inputs plus the experiment config, renders the prompt, calls the model, and returns a `TargetOutput` (wrapping the raw `CompletionResponse` plus the post-processed `output`).
 - **Experiment**: a named pair of `TargetFunction + ExperimentConfig`.
-- **Trial**: the result of running one experiment on one example. It stores either the successful model response or the error that occurred.
-- **Metric**: a scoring definition: what to measure, whether a reference is needed, the score scale, and the scorer function.
-- **MetricResult**: one metric applied to one trial.
+- **Trial**: the result of running one experiment on one example. Modeled as a tagged union — `SuccessfulTrial` holds the `TargetOutput`, `FailedTrial` holds the exception. Discriminate with `isinstance` or `match`.
+- **Metric**: a scoring definition: what to measure, the score scale, and the scorer function (plus optional `judge_config` for LLM judges).
+- **MetricResult**: one metric applied to one trial. Also a tagged union — `ScoredResult` carries a `Score`, `ScoringError` carries the exception raised by the scorer.
 - **RunResults**: the complete output of a run: all trials, all metric results, run metadata, and aggregate helpers.
 
 ## 2. Generation: examples become trials
@@ -46,12 +46,12 @@ sequenceDiagram
     Tgt->>Tgt: render prompt
     Tgt->>Model: send one user message
     Model-->>Tgt: CompletionResponse
-    Tgt-->>Tr: response
+    Tgt-->>Tr: TargetOutput
 ```
 
-The harness does **not** render prompts itself. Prompt rendering belongs to the `TargetFunction`. After the call, the exact prompt can be read from `Trial.rendered_prompt`, which inspects the returned `CompletionResponse`.
+The harness does **not** render prompts itself. Prompt rendering belongs to the `TargetFunction`. After the call, the exact prompt can be read from `SuccessfulTrial.rendered_prompt`, which inspects the request attached to the returned `CompletionResponse`.
 
-If the target fails, the `Trial` stores the exception in `error` instead of a response. The run can continue and failures are reflected in `failure_rate`.
+If the target raises, the harness records a `FailedTrial` carrying the exception instead of a `SuccessfulTrial`. The run continues and failures are reflected in `failure_rate`.
 
 ## 3. Scoring: trials become metric results
 
@@ -67,10 +67,11 @@ flowchart TD
 
 A `Metric` defines how a trial should be scored:
 
-- `requires_reference` says whether `Example.reference` must exist.
 - `scale` validates raw scores and maps them to `[0, 1]`.
-- `scorer` computes the score.
-- `judge_config`, when present, marks the metric as an LLM-judge metric.
+- `scorer` computes the score. Metrics that need a reference simply read `example.reference` inside the scorer.
+- `judge_config`, when present, marks the metric as an LLM-judge metric; the harness then invokes `scorer` with the `StochasticScorer` signature.
+
+When a scorer raises, the harness records a `ScoringError` instead of a `ScoredResult`. Scoring errors are excluded from quality aggregates (so a flaky judge does not bias the run) and surfaced separately via `score_failure_rate`.
 
 There are two scorer shapes:
 
@@ -110,8 +111,8 @@ flowchart TD
 
 `RunResults` keeps two parallel views:
 
-1. **Trials**: one per example. Use these for telemetry such as latency, token counts, and failures. This avoids counting the same model call once per metric.
-2. **MetricResults**: one per `(trial, metric)` pair. Use these for quality aggregation.
+1. **Trials** (`list[SuccessfulTrial | FailedTrial]`): one per example. Use these for telemetry such as latency, token counts, and failures. This avoids counting the same model call once per metric. Helpers: `successful_trials`, `successful_responses`, `failure_rate`, `mean_latency`, `mean_output_tokens`, `total_output_tokens`.
+2. **MetricResults** (`list[ScoredResult | ScoringError]`): one per `(trial, metric)` pair. Use these for quality aggregation. Helpers: `scored_results`, `mean_normalized`, `per_example`, `per_metric`, `score_failure_rate`.
 
 In short:
 
