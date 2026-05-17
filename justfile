@@ -1,4 +1,4 @@
-set dotenv-load := true
+set dotenv-load
 
 # Python environment ----------------------------------------------------------
 
@@ -28,8 +28,8 @@ run-hooks:
 
 # Code quality ----------------------------------------------------------------
 format:
-    uv run ruff check --fix .
-    uv run ruff format .
+    uv run ruff check --fix src
+    uv run ruff format src
 
 check-types:
     uv run ty check src

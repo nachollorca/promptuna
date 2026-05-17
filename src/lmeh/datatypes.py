@@ -220,7 +220,7 @@ class Score:
     """
 
     raw: int | float | str
-    normalized: float
+    normalized: float | None = None
     reason: str = ""
 
 
