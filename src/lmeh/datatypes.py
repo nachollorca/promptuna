@@ -3,15 +3,15 @@
 Conceptual flow:
 
     Dataset -> Example
-    Experiment = TargetFunction + ExperimentConfig
+    Experiment = TargetFunction + TargetConfig
     Trial = result of running one Experiment on one Example
     Metric = scoring definition
-    MetricResult = one Metric applied to one Trial
-    RunResults = all Trials and MetricResults from one Experiment run
+    Scoring = one Metric applied to one Trial
+    RunResults = all Trials and Scorings from one Experiment run
 
 The harness keeps generation and scoring separate:
 - Trials store target execution results.
-- MetricResults store metric results.
+- Scorings store metric results.
 """
 
 from abc import ABC, abstractmethod
@@ -47,11 +47,11 @@ Dataset = list[Example]
 
 
 @dataclass
-class ExperimentConfig:
-    """The moving pieces of an Experiment that the harness can sweep.
+class TargetConfig:
+    """The moving pieces of a ``TargetFunction`` that the harness can sweep.
 
-    A ``TargetFunction`` receives these fields plus the per-example ``inputs``
-    that get processed into ``prompt_template``.
+    A ``TargetFunction`` receives an instance of this config plus the
+    per-example ``inputs`` it must render into ``prompt_template``.
 
     Args:
         model: Identifier of the model to call.
@@ -109,8 +109,8 @@ class TargetFunction(Protocol):
     Chains of multiple LM calls are out of scope.
 
     The target is the sole owner of prompt rendering: it transforms
-    ``inputs``, renders them into ``prompt_template``, and dispatches the
-    result as a single user message. The harness never re-renders the
+    ``inputs``, renders them into ``config.prompt_template``, and dispatches
+    the result as a single user message. The harness never re-renders the
     template; it reads the exact string the target sent back off
     ``TargetOutput.request.prompt`` (see ``Trial.rendered_prompt``).
     """
@@ -118,10 +118,7 @@ class TargetFunction(Protocol):
     def __call__(  # noqa: D102
         self,
         inputs: dict[str, Any],
-        model: str,
-        prompt_template: str,
-        generation_kwargs: dict | None = None,
-        output_schema: type[BaseModel] | None = None,
+        config: TargetConfig,
     ) -> TargetOutput: ...
 
 
@@ -131,7 +128,7 @@ class Experiment:
 
     name: str
     target: TargetFunction
-    config: ExperimentConfig
+    config: TargetConfig
 
 
 @dataclass
@@ -149,8 +146,8 @@ class Score:
     reason: str = ""
 
 
-class DeterministicScorer(Protocol):
-    """Signature of any deterministic (non-LLM) scoring function."""
+class ProgrammaticScorer(Protocol):
+    """Signature of any programmatic (non-LLM) scoring function."""
 
     def __call__(  # noqa: D102
         self,
@@ -167,7 +164,7 @@ class JudgeConfig:
     generation_kwargs: dict[str, Any] | None = None
 
 
-class StochasticScorer(Protocol):
+class LLMJudgeScorer(Protocol):
     """Signature of any LLM-judge scoring function.
 
     Receives the rendered target prompt so the judge can reason about both
@@ -255,14 +252,14 @@ class Metric:
         scale: Scale used to validate and normalize raw scores.
         scorer: Callable producing the score; deterministic or LLM-based.
         judge_config: Required for LLM-judge metrics. If present, the harness
-            calls ``scorer`` as a ``StochasticScorer``; otherwise it calls it as
-            a ``DeterministicScorer``.
+            calls ``scorer`` as an ``LLMJudgeScorer``; otherwise it calls it as
+            a ``ProgrammaticScorer``.
     """
 
     name: str
     description: str
     scale: Scale
-    scorer: DeterministicScorer | StochasticScorer
+    scorer: ProgrammaticScorer | LLMJudgeScorer
     judge_config: JudgeConfig | None = None
 
 
@@ -307,7 +304,7 @@ failed trials remain in ``RunResults.trials`` and count against the run.
 
 
 @dataclass(frozen=True)
-class ScoredResult:
+class SuccessfulScoring:
     """A metric successfully applied to a trial, producing a ``Score``.
 
     Sentinel zero scores emitted for failed trials also live here: from the
@@ -322,7 +319,7 @@ class ScoredResult:
 
 
 @dataclass(frozen=True)
-class ScoringError:
+class FailedScoring:
     """A scorer crashed (e.g. judge returned malformed output).
 
     Excluded from quality aggregates so a flaky judge does not bias results.
@@ -333,7 +330,7 @@ class ScoringError:
     error: Exception
 
 
-MetricResult = ScoredResult | ScoringError
+Scoring = SuccessfulScoring | FailedScoring
 """The result of applying one Metric to one Trial (tagged union)."""
 
 
@@ -354,7 +351,7 @@ class RunResults:
     - ``trials``: one entry per example. Telemetry aggregates (latency,
       output tokens) iterate this list so an example evaluated by N metrics
       is not overcounted.
-    - ``metric_results``: one entry per (trial, metric) pair. Failed trials
+    - ``scorings``: one entry per (trial, metric) pair. Failed trials
       contribute zero scores (the target is what's under evaluation);
       scorer errors contribute entries with ``error`` set and are excluded
       from quality aggregates.
@@ -365,7 +362,7 @@ class RunResults:
     experiment: Experiment
     run: RunInfo
     trials: list[Trial]
-    metric_results: list[MetricResult]
+    scorings: list[Scoring]
 
     @property
     def successful_trials(self) -> list[SuccessfulTrial]:
@@ -383,18 +380,18 @@ class RunResults:
         return 1.0 - len(self.successful_trials) / len(self.trials) if self.trials else 0.0
 
     @property
-    def scored_results(self) -> list[ScoredResult]:
-        """Metric results that produced a score (excludes scorer errors)."""
-        return [r for r in self.metric_results if isinstance(r, ScoredResult)]
+    def successful_scorings(self) -> list[SuccessfulScoring]:
+        """Scorings that produced a score (excludes scorer errors)."""
+        return [r for r in self.scorings if isinstance(r, SuccessfulScoring)]
 
     @property
     def mean_normalized(self) -> float:
-        """Average normalized score across every successfully scored result."""
-        return _mean(r.score.normalized for r in self.scored_results)
+        """Average normalized score across every successful scoring."""
+        return _mean(r.score.normalized for r in self.successful_scorings)
 
     def per_example(self) -> dict[int, float]:
         """Return mean normalized score per example, keyed by ``id(example)``."""
-        scored = self.scored_results
+        scored = self.successful_scorings
         return {
             id(ex): _mean(r.score.normalized for r in scored if r.trial.example is ex)
             for ex in {id(r.trial.example): r.trial.example for r in scored}.values()
@@ -402,7 +399,7 @@ class RunResults:
 
     def per_metric(self) -> dict[str, float]:
         """Return mean normalized score per metric, keyed by metric name."""
-        scored = self.scored_results
+        scored = self.successful_scorings
         names = {r.metric.name for r in scored}
         return {
             name: _mean(r.score.normalized for r in scored if r.metric.name == name)
@@ -410,12 +407,12 @@ class RunResults:
         }
 
     @property
-    def score_failure_rate(self) -> float:
-        """Fraction of metric results where the scorer itself errored, in ``[0, 1]``."""
-        if not self.metric_results:
+    def scoring_failure_rate(self) -> float:
+        """Fraction of scorings where the scorer itself errored, in ``[0, 1]``."""
+        if not self.scorings:
             return 0.0
-        errors = sum(1 for r in self.metric_results if isinstance(r, ScoringError))
-        return errors / len(self.metric_results)
+        errors = sum(1 for r in self.scorings if isinstance(r, FailedScoring))
+        return errors / len(self.scorings)
 
     @property
     def mean_latency(self) -> float:

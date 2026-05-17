@@ -3,13 +3,13 @@
 Two entry points:
 
 - :func:`run_experiment` blocks and returns a fully-populated :class:`RunResults`.
-- :func:`stream_experiment` yields :class:`Trial` and :class:`MetricResult` items
+- :func:`stream_experiment` yields :class:`Trial` and :class:`Scoring` items
   as soon as they are ready, so callers can render progress or persist
   partial results and survive mid-run crashes.
 
 Both share the same threaded engine. ``run_trial`` and ``score_metric`` are
 total functions: they never raise, instead wrapping failures into
-``FailedTrial`` / ``ScoringError`` so the executor loop stays simple.
+``FailedTrial`` / ``FailedScoring`` so the executor loop stays simple.
 """
 
 from collections.abc import Iterator
@@ -21,16 +21,16 @@ from .datatypes import (
     Dataset,
     Example,
     Experiment,
-    ExperimentConfig,
+    FailedScoring,
     FailedTrial,
     Metric,
-    MetricResult,
     RunInfo,
     RunResults,
     Score,
-    ScoredResult,
-    ScoringError,
+    Scoring,
+    SuccessfulScoring,
     SuccessfulTrial,
+    TargetConfig,
     TargetFunction,
     Trial,
 )
@@ -48,17 +48,17 @@ def run_experiment(
     :func:`stream_experiment`.
     """
     trials: list[Trial] = []
-    metric_results: list[MetricResult] = []
+    scorings: list[Scoring] = []
     for item in stream_experiment(experiment, dataset, metrics, workers=workers):
         if isinstance(item, (SuccessfulTrial, FailedTrial)):
             trials.append(item)
         else:
-            metric_results.append(item)
+            scorings.append(item)
     return RunResults(
         experiment=experiment,
         run=RunInfo(),
         trials=trials,
-        metric_results=metric_results,
+        scorings=scorings,
     )
 
 
@@ -67,16 +67,16 @@ def stream_experiment(
     dataset: Dataset,
     metrics: list[Metric],
     workers: int = 1,
-) -> Iterator[Trial | MetricResult]:
-    """Run the experiment, yielding trials and metric results as they land.
+) -> Iterator[Trial | Scoring]:
+    """Run the experiment, yielding trials and scorings as they land.
 
     Order is not deterministic: items arrive in completion order. A trial is
-    always yielded before any of its metric results.
+    always yielded before any of its scorings.
 
-    The same thread pool is shared between target calls and stochastic
+    The same thread pool is shared between target calls and LLM-judge
     scorers so workers stay saturated: scoring for an example starts as soon
     as its trial completes, without waiting for the rest of the dataset.
-    Deterministic scorers run inline on the consumer thread (they are
+    Programmatic scorers run inline on the consumer thread (they are
     cheap and not I/O-bound).
     """
     _validate_run(experiment=experiment, dataset=dataset, metrics=metrics)
@@ -88,7 +88,7 @@ def stream_experiment(
         trial_futures: dict[Future[Trial], Example] = {
             pool.submit(run_trial, experiment.target, experiment.config, ex): ex for ex in dataset
         }
-        score_futures: list[Future[MetricResult]] = []
+        score_futures: list[Future[Scoring]] = []
 
         for fut in as_completed(trial_futures):
             trial = fut.result()  # run_trial never raises
@@ -96,10 +96,10 @@ def stream_experiment(
 
             for metric in metrics:
                 if metric.judge_config is None:
-                    # Deterministic: cheap, run inline and yield immediately.
+                    # Programmatic: cheap, run inline and yield immediately.
                     yield score_metric(trial, metric)
                 else:
-                    # Stochastic: I/O-bound, offload to the pool.
+                    # LLM judge: I/O-bound, offload to the pool.
                     score_futures.append(pool.submit(score_metric, trial, metric))
 
         for fut in as_completed(score_futures):
@@ -108,7 +108,7 @@ def stream_experiment(
 
 def run_trial(
     target: TargetFunction,
-    config: ExperimentConfig,
+    config: TargetConfig,
     example: Example,
 ) -> Trial:
     """Execute ``target`` against one ``example``.
@@ -118,30 +118,24 @@ def run_trial(
     failures are data, not bugs in the harness.
     """
     try:
-        result = target(
-            inputs=example.inputs,
-            model=config.model,
-            prompt_template=config.prompt_template,
-            generation_kwargs=config.generation_kwargs,
-            output_schema=config.output_schema,
-        )
+        result = target(inputs=example.inputs, config=config)
         return SuccessfulTrial(example=example, result=result)
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:
         return FailedTrial(example=example, error=err)
 
 
-def score_metric(trial: Trial, metric: Metric) -> MetricResult:
+def score_metric(trial: Trial, metric: Metric) -> Scoring:
     """Apply ``metric`` to ``trial``.
 
     Total function: any exception (scorer crash, malformed judge output,
-    out-of-scale value) is captured into a :class:`ScoringError`.
+    out-of-scale value) is captured into a :class:`FailedScoring`.
 
     Failed trials short-circuit to a sentinel zero score so they still
     contribute to quality aggregates — the target is what is under
     evaluation.
     """
     if isinstance(trial, FailedTrial):
-        return ScoredResult(
+        return SuccessfulScoring(
             trial=trial,
             metric=metric,
             score=Score(raw=0, normalized=0.0, reason=f"trial failed: {trial.error!r}"),
@@ -161,9 +155,9 @@ def score_metric(trial: Trial, metric: Metric) -> MetricResult:
         # Trust scorer-provided normalized value if scale already validated raw;
         # recompute to keep the contract consistent.
         score.normalized = metric.scale.normalize(score.raw)
-        return ScoredResult(trial=trial, metric=metric, score=score)
-    except Exception as err:  # noqa: BLE001
-        return ScoringError(trial=trial, metric=metric, error=err)
+        return SuccessfulScoring(trial=trial, metric=metric, score=score)
+    except Exception as err:
+        return FailedScoring(trial=trial, metric=metric, error=err)
 
 
 def _validate_run(
