@@ -1,0 +1,120 @@
+{
+    "cells": [
+        {
+            "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+            "console": [],
+            "id": "Hbol",
+            "outputs": [
+                {
+                    "data": {
+                        "text/plain": ""
+                    },
+                    "type": "data"
+                }
+            ]
+        },
+        {
+            "code_hash": "189a1d236ee2a99670c99aa53b3dcf67",
+            "console": [],
+            "id": "MJUe",
+            "outputs": [
+                {
+                    "data": {
+                        "text/plain": ""
+                    },
+                    "type": "data"
+                }
+            ]
+        },
+        {
+            "code_hash": "e53810554a78ff8de6fd41f0ab113e23",
+            "console": [],
+            "id": "vblA",
+            "outputs": [
+                {
+                    "data": {
+                        "text/plain": ""
+                    },
+                    "type": "data"
+                }
+            ]
+        },
+        {
+            "code_hash": "45fbb5a88c481962aaf4e5d7908d920b",
+            "console": [],
+            "id": "bkHC",
+            "outputs": [
+                {
+                    "data": {
+                        "text/plain": ""
+                    },
+                    "type": "data"
+                }
+            ]
+        },
+        {
+            "code_hash": "a2eaea3ddedaa1235652ef6a558e1e1a",
+            "console": [
+                {
+                    "mimetype": "text/plain",
+                    "name": "stdout",
+                    "text": "is_hate=True reason='The comment is a direct personal attack based on physical appearance, which can be considered hateful or derogatory.'\n",
+                    "type": "stream"
+                }
+            ],
+            "id": "lEQa",
+            "outputs": [
+                {
+                    "data": {
+                        "text/plain": ""
+                    },
+                    "type": "data"
+                }
+            ]
+        },
+        {
+            "code_hash": "e5d2054a7b52be3c1767b96cd582d8ef",
+            "console": [],
+            "id": "PKri",
+            "outputs": [
+                {
+                    "data": {
+                        "text/plain": ""
+                    },
+                    "type": "data"
+                }
+            ]
+        },
+        {
+            "code_hash": "2883b33030e26cbb78f066cf75f77350",
+            "console": [
+                {
+                    "mimetype": "text/plain",
+                    "name": "stdout",
+                    "text": "Score(raw=True, normalized=1.0, reason='')\n",
+                    "type": "stream"
+                }
+            ],
+            "id": "Xref",
+            "outputs": [
+                {
+                    "data": {
+                        "text/plain": ""
+                    },
+                    "type": "data"
+                }
+            ]
+        },
+        {
+            "code_hash": null,
+            "console": [],
+            "id": "WXER",
+            "outputs": []
+        }
+    ],
+    "metadata": {
+        "marimo_version": "0.23.6",
+        "script_metadata_hash": null
+    },
+    "version": "1"
+}
