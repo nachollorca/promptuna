@@ -60,3 +60,6 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# notes
+scratchpad.md
