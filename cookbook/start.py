@@ -1,11 +1,12 @@
 import marimo
 
 __generated_with = "0.23.6"
-app = marimo.App(width="medium")
+app = marimo.App(width="medium", auto_download=["ipynb"])
 
 
 @app.cell
 def _():
+    import marimo as mo
 
     return
 

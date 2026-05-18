@@ -14,7 +14,7 @@
             ]
         },
         {
-            "code_hash": "189a1d236ee2a99670c99aa53b3dcf67",
+            "code_hash": "8dd910c9f08f170284dbd3b1984db4d2",
             "console": [],
             "id": "MJUe",
             "outputs": [
@@ -58,7 +58,7 @@
                 {
                     "mimetype": "text/plain",
                     "name": "stdout",
-                    "text": "is_hate=True reason='The comment is a direct personal attack based on physical appearance, which can be considered hateful or derogatory.'\n",
+                    "text": "is_hate=True reason=\"The comment contains a direct personal insult ('ugly') targeting an individual's physical appearance, which is a form of hate speech as it degrades and demeans the person.\"\n",
                     "type": "stream"
                 }
             ],
@@ -108,7 +108,7 @@
         {
             "code_hash": null,
             "console": [],
-            "id": "WXER",
+            "id": "SFPL",
             "outputs": []
         }
     ],
