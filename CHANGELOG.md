@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-05-18)
+
+### Documentation
+
+- **cookbook**: Add initial draft notebook
+  ([`19725e6`](https://github.com/nachollorca/lmeh/commit/19725e6c33567134d34d2257cab4d32f30c05040))
+
+- **cookbook**: Include ipynotebooks
+  ([`d82a789`](https://github.com/nachollorca/lmeh/commit/d82a7897c3f234090639e58c47b7fcc136a53ed8))
+
+- **readme**: Add execution section
+  ([`7da8d50`](https://github.com/nachollorca/lmeh/commit/7da8d5096e0a1f79d5a9f9af08d86b1cf58801f4))
+
+### Features
+
+- **jugdge**: Create a default LLM judge
+  ([`ddff7f3`](https://github.com/nachollorca/lmeh/commit/ddff7f38bfddd54b38d1069be8eeb017acb4cea0))
+
+
 ## v1.1.0 (2026-05-17)
 
 ### Bug Fixes
