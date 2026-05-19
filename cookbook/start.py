@@ -52,7 +52,9 @@ def _(mo):
     mo.md(r"""
     Now, we define the target function that performs the classification. Its outputs are the ones we will evaluate.
 
-    The function must adhere to the `TargetFunction` protocol: take its **named inputs**, the **prompt template**, and an **LM config**, then return a `TargetOutput`. The harness unpacks `Example.inputs` as keyword arguments, so the parameter names here must match the dict keys.
+    The function must adhere to the `TargetFunction` protocol: take its **named inputs**, the **prompt template**, and an **LM config**, then return whatever value the downstream scorers should consume — a bool, a string, a pydantic model, etc. The harness unpacks `Example.inputs` as keyword arguments, so the parameter names here must match the dict keys.
+
+    The underlying `CompletionRequest` / `CompletionResponse` are captured automatically (via `lmdk.observe`) and attached to the trial — the target does not need to surface them.
     """)
     return
 
@@ -61,18 +63,17 @@ def _(mo):
 def _():
     from lmdk import complete, render_template
 
-    from lmeh.datatypes import LMConfig, TargetOutput
+    from lmeh.datatypes import LMConfig
 
-    def detect_hate(comment: str, prompt_template: str, config: LMConfig) -> TargetOutput:
+    def detect_hate(comment: str, prompt_template: str, config: LMConfig) -> bool:
         prompt = render_template(template=prompt_template, COMMENT=comment)
         response = complete(
             model=config.model,
             generation_kwargs=config.generation_kwargs,
             prompt=prompt,
-            return_request=True,
             output_schema=config.output_schema,
         )
-        return TargetOutput.passthrough(response=response)
+        return response.output.is_hate
 
     return LMConfig, detect_hate
 
@@ -122,7 +123,7 @@ def _(config, dataset, detect_hate, prompt_template):
         example=dataset[0],
     )
 
-    print(trial.result.output)
+    trial.output
     return (trial,)
 
 
@@ -143,7 +144,7 @@ def _(Example):
     from lmeh.datatypes import Ordinal, ProgrammaticMetric, Score
 
     def is_correct(output: bool, example: Example) -> Score:
-        raw_score = output.is_hate == example.reference
+        raw_score = output == example.reference
         if raw_score:
             reason = "Output matches the reference"
         else:

@@ -75,38 +75,6 @@ class LMConfig:
     output_schema: type[BaseModel] | None = None
 
 
-@dataclass(frozen=True)
-class TargetOutput:
-    """What every ``TargetFunction`` must return.
-
-    Separates the three things the harness cares about:
-
-    - ``response``: the raw ``CompletionResponse`` from ``lmdk``. Carries the
-      originating ``CompletionRequest`` on ``response.request`` (i.e. the
-      final, fully-rendered prompt and kwargs that were sent to the model),
-      along with telemetry (latency, token counts, finish reason, native
-      ``output`` parsed/unparsed). Treated as immutable by the harness.
-    - ``output``: the post-processed product the function actually wants to
-      expose. Scorers consume this. If the target does no post-processing,
-      it equals ``response.output``.
-
-    Use ``TargetOutput.passthrough(response)`` for the no-postprocessing case.
-    """
-
-    response: CompletionResponse
-    output: Any
-
-    @property
-    def request(self) -> CompletionRequest | None:
-        """Shortcut to ``response.request``: the final request sent to the LM."""
-        return self.response.request
-
-    @classmethod
-    def passthrough(cls, response: CompletionResponse) -> "TargetOutput":
-        """Build a ``TargetOutput`` with no post-processing applied."""
-        return cls(response=response, output=response.output)
-
-
 class TargetFunction(Protocol):
     """The shape every function under evaluation must follow.
 
@@ -115,6 +83,12 @@ class TargetFunction(Protocol):
     prepare the prompt (e.g. format inputs, render the template) and after
     the call to refine the model's response (e.g. parse, validate, repair).
     Chains of multiple LM calls are out of scope.
+
+    The target may return whatever Python value is most natural for the
+    downstream scorers — a bool, a string, a pydantic model, a tuple. The
+    harness captures the underlying ``CompletionRequest`` /
+    ``CompletionResponse`` automatically via ``lmdk.observe``, so the target
+    does not need to surface them explicitly.
     """
 
     def __call__(  # noqa: D102
@@ -123,7 +97,7 @@ class TargetFunction(Protocol):
         prompt_template: str,
         config: LMConfig,
         **inputs: Any,
-    ) -> TargetOutput: ...
+    ) -> Any: ...
 
 
 @dataclass
@@ -338,13 +312,17 @@ Dispatch with ``isinstance`` — the two variants carry different state
 class SuccessfulTrial:
     """A trial whose target executed without raising.
 
-    ``result`` carries the post-processed output plus the raw
-    ``CompletionResponse`` (latency, tokens, finish reason, originating
-    request, etc.).
+    ``output`` is whatever the target returned (free-form). ``request`` and
+    ``response`` are captured automatically by the harness via
+    ``lmdk.observe`` around the target call: they hold the final rendered
+    prompt + kwargs and the raw LM response (latency, tokens, finish reason,
+    etc.). They are ``None`` only if the target performed no completion.
     """
 
     example: Example
-    result: TargetOutput
+    output: Any
+    request: CompletionRequest | None = None
+    response: CompletionResponse | None = None
 
     @property
     def rendered_prompt(self) -> str:
@@ -352,9 +330,8 @@ class SuccessfulTrial:
 
         The harness assumes targets send exactly one user message.
         """
-        request = self.result.request
-        assert request is not None, "Successful trial must carry a request"
-        return request.prompt[0].content
+        assert self.request is not None, "Successful trial must carry a request"
+        return self.request.prompt[0].content
 
 
 @dataclass(frozen=True)
@@ -443,7 +420,7 @@ class RunResults:
     @property
     def successful_responses(self) -> list[CompletionResponse]:
         """Raw LM responses from successful trials."""
-        return [t.result.response for t in self.successful_trials]
+        return [t.response for t in self.successful_trials if t.response is not None]
 
     @property
     def failure_rate(self) -> float:
