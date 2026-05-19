@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-05-19)
+
+### Features
+
+- **datatypes**: Remove TargetOutput because now lmdk can natively observe requests / responses when
+  complete is called
+  ([`69cfef5`](https://github.com/nachollorca/lmeh/commit/69cfef53931aaa2f18c07e458037e0fd640636fa))
+
+
 ## v1.3.0 (2026-05-18)
 
 ### Continuous Integration
