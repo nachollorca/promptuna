@@ -15,6 +15,7 @@ total functions: they never raise, instead wrapping failures into
 from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
+from lmdk import observe
 from pydantic import BaseModel
 
 from .datatypes import (
@@ -131,8 +132,17 @@ def run_trial(
     failures are data, not bugs in the harness.
     """
     try:
-        result = target(prompt_template=prompt_template, config=config, **example.inputs)
-        return SuccessfulTrial(example=example, result=result)
+        with observe() as obs:
+            output = target(prompt_template=prompt_template, config=config, **example.inputs)
+
+        assert len(obs.records) == 1, "The target function must call `complete` exactly one time"
+        last = obs.records[-1] if obs.records else None
+        return SuccessfulTrial(
+            example=example,
+            output=output,
+            request=last.request if last else None,
+            response=last.response if last else None,
+        )
     except Exception as err:
         return FailedTrial(example=example, error=err)
 
@@ -156,10 +166,10 @@ def score_metric(trial: Trial, metric: Metric) -> Scoring:
 
     try:
         if isinstance(metric, ProgrammaticMetric):
-            score = metric.scorer(trial.result.output, trial.example)
+            score = metric.scorer(trial.output, trial.example)
         else:  # LLMJudgeMetric
             score = metric.scorer(
-                trial.result.output,
+                trial.output,
                 trial.example,
                 metric,
                 metric.config,
