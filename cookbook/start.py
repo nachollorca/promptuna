@@ -26,9 +26,9 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Let's start with a basic example. The task is **text classification**. In particular, we want to find out whether some social media comments contain hate speech or not.
+    Let's walk through a small but realistic example. The task is **product review sentiment analysis**: given a customer review, predict whether the sentiment is `positive`, `neutral`, or `negative`, and produce a short justification for the call.
 
-    We define some examples to begin with:
+    We start with a tiny labelled dataset. The `reference` is the ground-truth label.
     """)
     return
 
@@ -38,11 +38,26 @@ def _():
     from lmeh.datatypes import Example
 
     dataset = [
-        Example(inputs={"comment": "I think you are pretty ugly"}, reference=True),
-        Example(inputs={"comment": "I love raspberry muffins"}, reference=False),
-        Example(inputs={"comment": "What is wrong with ur face bro?"}, reference=True),
-        Example(inputs={"comment": "Paris is the capital of Italy"}, reference=False),
-        Example(inputs={"comment": "a cagar al campo chaval"}, reference=True),
+        Example(
+            inputs={"review": "Battery lasts two full days and the screen is gorgeous. Best phone I've owned."},
+            reference="positive",
+        ),
+        Example(
+            inputs={"review": "It works. Setup was fine, nothing surprising, nothing to complain about."},
+            reference="neutral",
+        ),
+        Example(
+            inputs={"review": "Stopped charging after three weeks. Support never replied. Avoid."},
+            reference="negative",
+        ),
+        Example(
+            inputs={"review": "    Camera   is   AMAZING!!!   colors pop, low-light is great.\n\n\nHighly recommend."},
+            reference="positive",
+        ),
+        Example(
+            inputs={"review": "Arrived on time. Packaging was a bit beaten up but the product itself looks ok."},
+            reference="neutral",
+        ),
     ]
     return Example, dataset
 
@@ -50,32 +65,50 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Now, we define the target function that performs the classification. Its outputs are the ones we will evaluate.
+    Now we define the target function — the **thing we actually want to evaluate**. Note that it is not just a thin wrapper around `complete()`: there can be real pre- and post-processing around the model call. That's intentional. In production, what users hit is rarely the raw completion; it's the completion plus the glue around it. The harness lets us evaluate that full product.
 
-    The function must adhere to the `TargetFunction` protocol: take its **named inputs**, the **prompt template**, and an **LM config**, then return whatever value the downstream scorers should consume — a bool, a string, a pydantic model, etc. The harness unpacks `Example.inputs` as keyword arguments, so the parameter names here must match the dict keys.
+    The function must adhere to the `TargetFunction` protocol: take its **named inputs**, the **prompt template**, and an **LM config**, then return whatever the downstream scorers should consume. The harness unpacks `Example.inputs` as keyword arguments, so the parameter names must match the dict keys.
 
-    The underlying `CompletionRequest` / `CompletionResponse` are captured automatically (via `lmdk.observe`) and attached to the trial — the target does not need to surface them.
+    The underlying `CompletionRequest` / `CompletionResponse` are captured automatically (via `lmdk.observe`) and attached to the trial — the target doesn't need to surface them.
     """)
     return
 
 
 @app.cell
 def _():
+    import re
+
     from lmdk import complete, render_template
 
     from lmeh.datatypes import LMConfig
 
-    def detect_hate(comment: str, prompt_template: str, config: LMConfig) -> bool:
-        prompt = render_template(template=prompt_template, COMMENT=comment)
+    ALLOWED_LABELS = {"positive", "neutral", "negative"}
+    MAX_REVIEW_CHARS = 500
+
+    def classify_sentiment(review: str, prompt_template: str, config: LMConfig) -> dict:
+        # Pre-processing: normalise whitespace and cap length
+        cleaned = re.sub(r"\s+", " ", review).strip()
+        if len(cleaned) > MAX_REVIEW_CHARS:
+            cleaned = cleaned[:MAX_REVIEW_CHARS] + "…"
+
+        # Call the model with lmdk.complete
+        prompt = render_template(template=prompt_template, REVIEW=cleaned)
         response = complete(
             model=config.model,
             generation_kwargs=config.generation_kwargs,
             prompt=prompt,
             output_schema=config.output_schema,
         )
-        return response.output.is_hate
 
-    return LMConfig, detect_hate
+        # Post-processing: normalize the label and fall back to"neutral"
+        label = (response.output.sentiment or "").strip().lower()
+        if label not in ALLOWED_LABELS:
+            label = "neutral"
+
+        # Return arbitrary format that will be downstream consumed
+        return {"sentiment": label, "reason": response.output.reason.strip()}
+
+    return LMConfig, classify_sentiment
 
 
 @app.cell(hide_code=True)
@@ -88,17 +121,24 @@ def _(mo):
 
 @app.cell
 def _(LMConfig):
+    from typing import Literal
+
     from pydantic import BaseModel, Field
 
     class Output(BaseModel):
-        is_hate: bool
-        reason: str = Field(description="The brief reason why the comment is hate speech or not")
+        sentiment: Literal["positive", "neutral", "negative"]
+        reason: str = Field(description="One short sentence justifying the sentiment label.")
 
-    prompt_template = "Do you think the comment '{{ COMMENT }}' is hate speech?"
+    prompt_template = """Your task is to classify the sentiment of this product review:
+
+    {{ REVIEW }}
+
+    The possible labels are 'positive', 'neutral' and 'negative'
+    """
 
     config = LMConfig(
         model="mistral:mistral-small-latest",
-        generation_kwargs={"temperature": 0.7},
+        generation_kwargs={"temperature": 0.2},
         output_schema=Output,
     )
     return config, prompt_template
@@ -107,17 +147,17 @@ def _(LMConfig):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    With these ingredients, we can already run a trial: execute the target function with one of the examples and the config under test.
+    With these ingredients, we can already run a trial: execute the target function on one example with the config under test.
     """)
     return
 
 
 @app.cell
-def _(config, dataset, detect_hate, prompt_template):
+def _(classify_sentiment, config, dataset, prompt_template):
     from lmeh.execution import run_trial
 
     trial = run_trial(
-        target=detect_hate,
+        target=classify_sentiment,
         prompt_template=prompt_template,
         config=config,
         example=dataset[0],
@@ -130,11 +170,9 @@ def _(config, dataset, detect_hate, prompt_template):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Now that our trial run successfully, we can jump into the quality measurements.
+    Now that our trial ran successfully, we can jump into quality measurements.
 
-    Let's define a silly metric that simply compares the output from the function for the given example against the reference (our truth value).
-
-    For this, we do not need an LLM judge. A `ProgrammaticMetric` whose scorer follows the `ProgrammaticScorer` protocol is more than enough. We define the possible values using the `Ordinal` scale.
+    First, a simple deterministic check: does the predicted label match the ground truth? No LLM judge needed — a `ProgrammaticMetric` whose scorer follows the `ProgrammaticScorer` protocol is the right tool. We declare the value space with an `Ordinal` scale.
     """)
     return
 
@@ -143,37 +181,38 @@ def _(mo):
 def _(Example):
     from lmeh.datatypes import Ordinal, ProgrammaticMetric, Score
 
-    def is_correct(output: bool, example: Example) -> Score:
-        raw_score = output == example.reference
-        if raw_score:
-            reason = "Output matches the reference"
-        else:
-            reason = "Output does not match the reference"
+    def label_match(output: dict, example: Example) -> Score:
+        predicted = output["sentiment"]
+        expected = example.reference
+        if predicted == expected:
+            return Score(raw=True, reason=f"Predicted '{predicted}' matches reference.")
+        return Score(
+            raw=False,
+            reason=f"Predicted '{predicted}', expected '{expected}'.",
+        )
 
-        return Score(raw=raw_score, reason=reason)
-
-    correctness = ProgrammaticMetric(
-        name="correctness",
-        description="whether the answer is correct or not",
+    label_correctness = ProgrammaticMetric(
+        name="label_correctness",
+        description="Whether the predicted sentiment label matches the ground-truth label.",
         scale=Ordinal(levels=[False, True]),
-        scorer=is_correct,
+        scorer=label_match,
     )
-    return Ordinal, correctness
+    return Ordinal, label_correctness
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Finally, we can just score the trial against the metric.
+    Now we score the trial against the metric.
     """)
     return
 
 
 @app.cell
-def _(correctness, trial):
+def _(label_correctness, trial):
     from lmeh.execution import score_metric
 
-    scoring = score_metric(trial=trial, metric=correctness)
+    scoring = score_metric(trial=trial, metric=label_correctness)
     scoring.score
     return (score_metric,)
 
@@ -181,7 +220,9 @@ def _(correctness, trial):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    For the sake of playing, we could also make an LLM Judge that evaluates the same and gives a brief explanation. You can use the default one or create one that adheres to the `LLMJudgeScorer` protocol. Judge metrics use the `LLMJudgeMetric` variant — they carry their own `LMConfig` and judge prompt template.
+    The label check is cheap and exact, but it tells us nothing about the *reason* the model produced — and a good sentiment classifier should be able to justify its call. That's a subjective, open-ended judgement with no ground truth, which is exactly where an LLM judge earns its keep.
+
+    We define an `LLMJudgeMetric` that grades the quality of the justification. It carries its own `LMConfig` and judge prompt template. We use the built-in `default_llm_judge`, which feeds the judge the rendered prompt, the target's output, the reference, and the metric description.
     """)
     return
 
@@ -191,30 +232,33 @@ def _(LMConfig, Ordinal):
     from lmeh.datatypes import LLMJudgeMetric
     from lmeh.judges import default_llm_judge
 
-    correctness_2 = LLMJudgeMetric(
-        name="correctness2",
-        description="whether the answer is correct or not",
-        scale=Ordinal(levels=[False, True]),
+    description = """Rate how well the 'reason' field justifies the predicted sentiment label given the original review. A good reason cites concrete cues from the review and is consistent with the predicted label. Score 'good' if the justification is grounded and coherent, 'poor' otherwise.
+    """
+
+    reason_quality = LLMJudgeMetric(
+        name="reason_quality",
+        description=description,
+        scale=Ordinal(levels=["poor", "good"]),
         scorer=default_llm_judge,
         config=LMConfig(
             model="mistral:mistral-medium-latest",
             generation_kwargs={"temperature": 0.1},
         ),
     )
-    return (correctness_2,)
+    return (reason_quality,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Lets evaluate it on the same example and see what the Judge thinks about the system output.
+    Let's see what the judge thinks about the system output on our first trial.
     """)
     return
 
 
 @app.cell
-def _(correctness_2, score_metric, trial):
-    judge_scoring = score_metric(trial=trial, metric=correctness_2)
+def _(reason_quality, score_metric, trial):
+    judge_scoring = score_metric(trial=trial, metric=reason_quality)
     judge_scoring.score
     return
 
@@ -222,26 +266,26 @@ def _(correctness_2, score_metric, trial):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Finally, we can make a full run: execute our `detect_hate` target function on all the examples from our dataset and evaluate our two metrics on the outputs.
+    Finally, we can wire it all together into an experiment: run `classify_sentiment` against every example in the dataset and score both metrics on each output.
     """)
     return
 
 
 @app.cell
 def _(
+    classify_sentiment,
     config,
-    correctness,
-    correctness_2,
     dataset,
-    detect_hate,
+    label_correctness,
     prompt_template,
+    reason_quality,
 ):
-    from lmeh.execution import run_experiment
     from lmeh.datatypes import Experiment
+    from lmeh.execution import run_experiment
 
     experiment = Experiment(
-        name="silly-test",
-        target=detect_hate,
+        name="sentiment-baseline",
+        target=classify_sentiment,
         prompt_template=prompt_template,
         config=config,
     )
@@ -249,8 +293,8 @@ def _(
     results = run_experiment(
         experiment=experiment,
         dataset=dataset,
-        metrics=[correctness, correctness_2],
-        workers=5
+        metrics=[label_correctness, reason_quality],
+        workers=5,
     )
     return (results,)
 
@@ -258,7 +302,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    And we can use a reporting utility to see the results.
+    And a reporting utility renders the results.
     """)
     return
 
@@ -266,6 +310,7 @@ def _(mo):
 @app.cell
 def _(mo, results):
     from lmeh.reporting import markdown_report
+
     mo.md(markdown_report(results))
     return
 
