@@ -16,7 +16,6 @@ from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
 from lmdk import observe
-from pydantic import BaseModel
 
 from .datatypes import (
     Dataset,
@@ -233,7 +232,3 @@ def _validate_experiment(experiment: Experiment) -> None:
     cfg = experiment.config
     if not cfg.model:
         raise ValueError("experiment.config.model is empty")
-    if cfg.output_schema is not None and not (
-        isinstance(cfg.output_schema, type) and issubclass(cfg.output_schema, BaseModel)
-    ):
-        raise ValueError("experiment.config.output_schema must be a pydantic BaseModel subclass")

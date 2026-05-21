@@ -27,7 +27,6 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from lmdk import CompletionRequest, CompletionResponse
-from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
 # Inputs: things the user defines
@@ -67,12 +66,17 @@ class LMConfig:
     Args:
         model: Identifier of the model to call.
         generation_kwargs: Extra arguments forwarded to the model call.
-        output_schema: Optional pydantic schema enforcing structured output.
+
+    Note:
+        Structured-output schemas are intentionally *not* part of this
+        config. The expected response shape is the caller's responsibility:
+        a target function defines the schema it needs internally, and LLM
+        judges build their own schema from the metric's scale. ``LMConfig``
+        only carries what is genuinely shared across call sites.
     """
 
     model: str
     generation_kwargs: dict[str, Any] | None = None
-    output_schema: type[BaseModel] | None = None
 
 
 class TargetFunction(Protocol):

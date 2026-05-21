@@ -39,11 +39,15 @@ def _():
 
     dataset = [
         Example(
-            inputs={"review": "Battery lasts two full days and the screen is gorgeous. Best phone I've owned."},
+            inputs={
+                "review": "Battery lasts two full days and the screen is gorgeous. Best phone I've owned."
+            },
             reference="positive",
         ),
         Example(
-            inputs={"review": "It works. Setup was fine, nothing surprising, nothing to complain about."},
+            inputs={
+                "review": "It works. Setup was fine, nothing surprising, nothing to complain about."
+            },
             reference="neutral",
         ),
         Example(
@@ -51,11 +55,15 @@ def _():
             reference="negative",
         ),
         Example(
-            inputs={"review": "    Camera   is   AMAZING!!!   colors pop, low-light is great.\n\n\nHighly recommend."},
+            inputs={
+                "review": "    Camera   is   AMAZING!!!   colors pop, low-light is great.\n\n\nHighly recommend."
+            },
             reference="positive",
         ),
         Example(
-            inputs={"review": "Arrived on time. Packaging was a bit beaten up but the product itself looks ok."},
+            inputs={
+                "review": "Arrived on time. Packaging was a bit beaten up but the product itself looks ok."
+            },
             reference="neutral",
         ),
     ]
@@ -65,7 +73,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Now we define the target function — the **thing we actually want to evaluate**. Note that it is not just a thin wrapper around `complete()`: there can be real pre- and post-processing around the model call. That's intentional. In production, what users hit is rarely the raw completion; it's the completion plus the glue around it. The harness lets us evaluate that full product.
+    Now we define the target function — the **thing we actually want to evaluate**. Note that it is not just a thin wrapper around `complete()`: there can be real pre- and post-processing around the model call. That's intentional. In production, what users hit is rarely the raw completion; it's the **completion plus the scaffold around it**. The harness lets us evaluate that full product.
 
     The function must adhere to the `TargetFunction` protocol: take its **named inputs**, the **prompt template**, and an **LM config**, then return whatever the downstream scorers should consume. The harness unpacks `Example.inputs` as keyword arguments, so the parameter names must match the dict keys.
 
@@ -77,8 +85,10 @@ def _(mo):
 @app.cell
 def _():
     import re
+    from typing import Literal
 
     from lmdk import complete, render_template
+    from pydantic import BaseModel, Field
 
     from lmeh.datatypes import LMConfig
 
@@ -91,13 +101,18 @@ def _():
         if len(cleaned) > MAX_REVIEW_CHARS:
             cleaned = cleaned[:MAX_REVIEW_CHARS] + "…"
 
+        # Define the output schema expected from the model
+        class Output(BaseModel):
+            sentiment: Literal["positive", "neutral", "negative"]
+            reason: str = Field(description="One short sentence justifying the sentiment label.")
+
         # Call the model with lmdk.complete
         prompt = render_template(template=prompt_template, REVIEW=cleaned)
         response = complete(
             model=config.model,
             generation_kwargs=config.generation_kwargs,
             prompt=prompt,
-            output_schema=config.output_schema,
+            output_schema=Output,
         )
 
         # Post-processing: normalize the label and fall back to"neutral"
@@ -114,21 +129,13 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Now, lets define the moving parts under test. The three sweepable axes are the **prompt template**, the **LM config** (model, generation kwargs, optional output schema), and the target function itself.
+    Now, lets define the moving parts under test. The two sweepable axes are the **prompt template** and the **LM config** (model, generation kwargs).
     """)
     return
 
 
 @app.cell
 def _(LMConfig):
-    from typing import Literal
-
-    from pydantic import BaseModel, Field
-
-    class Output(BaseModel):
-        sentiment: Literal["positive", "neutral", "negative"]
-        reason: str = Field(description="One short sentence justifying the sentiment label.")
-
     prompt_template = """Your task is to classify the sentiment of this product review:
 
     {{ REVIEW }}
@@ -139,7 +146,6 @@ def _(LMConfig):
     config = LMConfig(
         model="mistral:mistral-small-latest",
         generation_kwargs={"temperature": 0.2},
-        output_schema=Output,
     )
     return config, prompt_template
 
