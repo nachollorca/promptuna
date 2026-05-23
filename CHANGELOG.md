@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.5.0 (2026-05-23)
+
+### Documentation
+
+- Make a better getting_started notebook
+  ([`ae0c5ea`](https://github.com/nachollorca/lmeh/commit/ae0c5eaf080ee5bc0909465c68d39c2463007c57))
+
+### Features
+
+- Add repetition and aggregation in every stochastic touch
+  ([`d594478`](https://github.com/nachollorca/lmeh/commit/d5944783a013616ee8fd813ed9992257ab6c5783))
+
+### Refactoring
+
+- Extract helpers for the thread processor to reduce cyclomatic complexity
+  ([`6c1c15d`](https://github.com/nachollorca/lmeh/commit/6c1c15d3f72edc42e408404696e74a1e75950b68))
+
+- Remove `OutputSchema` from `LMConfig`, it is now only responsibility of the target function
+  ([`7b97e04`](https://github.com/nachollorca/lmeh/commit/7b97e049dcf530d1f4ff97a8312ae71958eed7e6))
+
+- Split RawScore from Score to keep contracts honest
+  ([`e260f0b`](https://github.com/nachollorca/lmeh/commit/e260f0b70a6656d09d87e3e948035c087d4326bf))
+
+
 ## v1.4.0 (2026-05-19)
 
 ### Features
