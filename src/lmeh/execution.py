@@ -87,36 +87,57 @@ def stream_experiment(
         return
 
     with ThreadPoolExecutor(max_workers=max(workers, 1)) as pool:
-        trial_futures: dict[Future[Trial], Example] = {
-            pool.submit(
-                run_trial,
-                experiment.target,
-                experiment.prompt_template,
-                experiment.config,
-                ex,
-                replicate=r,
-            ): ex
-            for ex in dataset
-            for r in range(experiment.repeats)
-        }
+        trial_futures = _submit_trials(pool, experiment, dataset)
         score_futures: list[Future[Scoring]] = []
 
         for fut in as_completed(trial_futures):
             trial = fut.result()  # run_trial never raises
             yield trial
-
-            for metric in metrics:
-                if isinstance(metric, ProgrammaticMetric):
-                    # Deterministic and cheap: run inline once, ignore repeats.
-                    yield score_metric(trial, metric)
-                else:
-                    # LLM judge: stochastic and I/O-bound. Offload each
-                    # replicate to the pool independently.
-                    for r in range(metric.repeats):
-                        score_futures.append(pool.submit(score_metric, trial, metric, replicate=r))
+            yield from _dispatch_scorings(pool, trial, metrics, score_futures)
 
         for fut in as_completed(score_futures):
             yield fut.result()  # score_metric never raises
+
+
+def _submit_trials(
+    pool: ThreadPoolExecutor,
+    experiment: Experiment,
+    dataset: Dataset,
+) -> dict[Future[Trial], Example]:
+    """Submit one trial future per ``(example, replicate)`` pair."""
+    return {
+        pool.submit(
+            run_trial,
+            experiment.target,
+            experiment.prompt_template,
+            experiment.config,
+            ex,
+            replicate=r,
+        ): ex
+        for ex in dataset
+        for r in range(experiment.repeats)
+    }
+
+
+def _dispatch_scorings(
+    pool: ThreadPoolExecutor,
+    trial: Trial,
+    metrics: list[Metric],
+    score_futures: list[Future[Scoring]],
+) -> Iterator[Scoring]:
+    """Score ``trial`` against every metric.
+
+    Programmatic metrics run inline and are yielded immediately (deterministic
+    and cheap, so repeats are ignored). LLM-judge metrics are stochastic and
+    I/O-bound: each replicate is offloaded to ``pool`` and appended to
+    ``score_futures`` for the caller to drain later.
+    """
+    for metric in metrics:
+        if isinstance(metric, ProgrammaticMetric):
+            yield score_metric(trial, metric)
+        else:
+            for r in range(metric.repeats):
+                score_futures.append(pool.submit(score_metric, trial, metric, replicate=r))
 
 
 def run_trial(
