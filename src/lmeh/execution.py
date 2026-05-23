@@ -193,19 +193,21 @@ def score_metric(trial: Trial, metric: Metric, replicate: int = 0) -> Scoring:
 
     try:
         if isinstance(metric, ProgrammaticMetric):
-            score = metric.scorer(trial.output, trial.example)
+            raw_score = metric.scorer(trial.output, trial.example)
         else:  # LLMJudgeMetric
-            score = metric.scorer(
+            raw_score = metric.scorer(
                 trial.output,
                 trial.example,
                 metric,
                 metric.config,
                 trial.rendered_prompt,
             )
-        metric.scale.validate(score.raw)
-        # Trust scorer-provided normalized value if scale already validated raw;
-        # recompute to keep the contract consistent.
-        score.normalized = metric.scale.normalize(score.raw)
+        metric.scale.validate(raw_score.raw)
+        score = Score(
+            raw=raw_score.raw,
+            normalized=metric.scale.normalize(raw_score.raw),
+            reason=raw_score.reason,
+        )
         return SuccessfulScoring(trial=trial, metric=metric, score=score, replicate=replicate)
     except Exception as err:
         return FailedScoring(trial=trial, metric=metric, error=err, replicate=replicate)

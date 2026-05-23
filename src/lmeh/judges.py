@@ -5,7 +5,7 @@ Provides ``default_llm_judge`` — a batteries-included scorer that:
 1. Builds a pydantic output schema from the metric's ``Scale``.
 2. Renders the judge prompt template with the trial's context.
 3. Calls the judge model with structured output.
-4. Returns a ``Score`` populated from the parsed response.
+4. Returns a ``RawScore`` populated from the parsed response.
 
 The default template (``default_judge_template`` in ``lmeh.datatypes``)
 expects these variables, which the default judge always provides:
@@ -25,7 +25,7 @@ from typing import Any, Literal
 from lmdk import complete, render_template
 from pydantic import BaseModel, ConfigDict, create_model
 
-from lmeh.datatypes import Example, LLMJudgeMetric, LMConfig, Ordinal, Range, Scale, Score
+from lmeh.datatypes import Example, LLMJudgeMetric, LMConfig, Ordinal, Range, RawScore, Scale
 
 
 def _schema_for_scale(scale: Scale) -> type[BaseModel]:
@@ -57,8 +57,8 @@ def default_llm_judge(
     metric: LLMJudgeMetric,
     config: LMConfig,
     rendered_prompt: str,
-) -> Score:
-    """Render the judge template, call the model, return a ``Score``.
+) -> RawScore:
+    """Render the judge template, call the model, return a ``RawScore``.
 
     The output schema is derived from ``metric.scale``. Any error (template
     rendering, model call, schema validation) propagates so the harness
@@ -80,4 +80,4 @@ def default_llm_judge(
     )
     parsed = response.parsed
     assert parsed is not None, "judge model returned no structured output"
-    return Score(raw=parsed.raw, reason=parsed.reason)
+    return RawScore(raw=parsed.raw, reason=parsed.reason)

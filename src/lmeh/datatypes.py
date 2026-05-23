@@ -195,8 +195,31 @@ class Ordinal(Scale):
 
 
 @dataclass
+class RawScore:
+    """What a scorer produces, before the harness normalizes it.
+
+    Scorers (programmatic or LLM-judge) only commit to the raw value and an
+    optional rationale. The harness validates ``raw`` against the metric's
+    scale and lifts a ``RawScore`` to a :class:`Score` by computing
+    ``normalized``. This keeps the user-facing contract minimal and the
+    downstream type (``Score.normalized``) honest (always present).
+
+    Args:
+        raw: Raw score in the metric's native scale.
+        reason: Optional rationale (typically populated by LLM judges).
+    """
+
+    raw: int | float | str
+    reason: str = ""
+
+
+@dataclass
 class Score:
     """The evaluation result for one example and one metric.
+
+    Produced by the harness from a :class:`RawScore` plus the metric's
+    scale. ``normalized`` is always populated — downstream aggregates rely
+    on this invariant.
 
     Args:
         raw: Raw score in the metric's native scale.
@@ -205,7 +228,7 @@ class Score:
     """
 
     raw: int | float | str
-    normalized: float | None = None
+    normalized: float
     reason: str = ""
 
 
@@ -216,7 +239,7 @@ class ProgrammaticScorer(Protocol):
         self,
         output: Any,
         example: Example,
-    ) -> Score: ...
+    ) -> RawScore: ...
 
 
 default_judge_template = """
@@ -268,7 +291,7 @@ class LLMJudgeScorer(Protocol):
         metric: "LLMJudgeMetric",
         config: LMConfig,
         rendered_prompt: str,
-    ) -> Score: ...
+    ) -> RawScore: ...
 
 
 @dataclass

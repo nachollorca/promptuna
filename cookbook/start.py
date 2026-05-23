@@ -185,14 +185,14 @@ def _(mo):
 
 @app.cell
 def _(Example):
-    from lmeh.datatypes import Ordinal, ProgrammaticMetric, Score
+    from lmeh.datatypes import Ordinal, ProgrammaticMetric, RawScore
 
-    def label_match(output: dict, example: Example) -> Score:
+    def label_match(output: dict, example: Example) -> RawScore:
         predicted = output["sentiment"]
         expected = example.reference
         if predicted == expected:
-            return Score(raw=True, reason=f"Predicted '{predicted}' matches reference.")
-        return Score(
+            return RawScore(raw=True, reason=f"Predicted '{predicted}' matches reference.")
+        return RawScore(
             raw=False,
             reason=f"Predicted '{predicted}', expected '{expected}'.",
         )
