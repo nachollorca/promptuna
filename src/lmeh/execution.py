@@ -94,8 +94,10 @@ def stream_experiment(
                 experiment.prompt_template,
                 experiment.config,
                 ex,
+                replicate=r,
             ): ex
             for ex in dataset
+            for r in range(experiment.repeats)
         }
         score_futures: list[Future[Scoring]] = []
 
@@ -105,11 +107,13 @@ def stream_experiment(
 
             for metric in metrics:
                 if isinstance(metric, ProgrammaticMetric):
-                    # Cheap, run inline and yield immediately.
+                    # Deterministic and cheap: run inline once, ignore repeats.
                     yield score_metric(trial, metric)
                 else:
-                    # LLM judge: I/O-bound, offload to the pool.
-                    score_futures.append(pool.submit(score_metric, trial, metric))
+                    # LLM judge: stochastic and I/O-bound. Offload each
+                    # replicate to the pool independently.
+                    for r in range(metric.repeats):
+                        score_futures.append(pool.submit(score_metric, trial, metric, replicate=r))
 
         for fut in as_completed(score_futures):
             yield fut.result()  # score_metric never raises
@@ -120,6 +124,7 @@ def run_trial(
     prompt_template: str,
     config: LMConfig,
     example: Example,
+    replicate: int = 0,
 ) -> Trial:
     """Execute ``target`` against one ``example``.
 
@@ -141,12 +146,13 @@ def run_trial(
             output=output,
             request=last.request if last else None,
             response=last.response if last else None,
+            replicate=replicate,
         )
     except Exception as err:
-        return FailedTrial(example=example, error=err)
+        return FailedTrial(example=example, error=err, replicate=replicate)
 
 
-def score_metric(trial: Trial, metric: Metric) -> Scoring:
+def score_metric(trial: Trial, metric: Metric, replicate: int = 0) -> Scoring:
     """Apply ``metric`` to ``trial``.
 
     Total function: any exception (scorer crash, malformed judge output,
@@ -161,6 +167,7 @@ def score_metric(trial: Trial, metric: Metric) -> Scoring:
             trial=trial,
             metric=metric,
             score=Score(raw=0, normalized=0.0, reason=f"trial failed: {trial.error!r}"),
+            replicate=replicate,
         )
 
     try:
@@ -178,9 +185,9 @@ def score_metric(trial: Trial, metric: Metric) -> Scoring:
         # Trust scorer-provided normalized value if scale already validated raw;
         # recompute to keep the contract consistent.
         score.normalized = metric.scale.normalize(score.raw)
-        return SuccessfulScoring(trial=trial, metric=metric, score=score)
+        return SuccessfulScoring(trial=trial, metric=metric, score=score, replicate=replicate)
     except Exception as err:
-        return FailedScoring(trial=trial, metric=metric, error=err)
+        return FailedScoring(trial=trial, metric=metric, error=err, replicate=replicate)
 
 
 def _validate_run(
@@ -224,6 +231,8 @@ def _validate_metrics(metrics: list[Metric]) -> None:
                 raise ValueError(f"metric {m.name!r}: config.model is empty")
             if not m.prompt_template:
                 raise ValueError(f"metric {m.name!r}: prompt_template is empty")
+            if m.repeats < 1:
+                raise ValueError(f"metric {m.name!r}: repeats must be >= 1, got {m.repeats}")
 
 
 def _validate_experiment(experiment: Experiment) -> None:
@@ -232,3 +241,5 @@ def _validate_experiment(experiment: Experiment) -> None:
     cfg = experiment.config
     if not cfg.model:
         raise ValueError("experiment.config.model is empty")
+    if experiment.repeats < 1:
+        raise ValueError(f"experiment.repeats must be >= 1, got {experiment.repeats}")

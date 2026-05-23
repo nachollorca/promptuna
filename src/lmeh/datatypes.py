@@ -106,12 +106,25 @@ class TargetFunction(Protocol):
 
 @dataclass
 class Experiment:
-    """A named target plus the prompt and LM config under test."""
+    """A named target plus the prompt and LM config under test.
+
+    Args:
+        name: Human-readable identifier for the experiment.
+        target: The function under evaluation.
+        prompt_template: Jinja-style template the target renders before
+            calling the model.
+        config: How to invoke the target model.
+        repeats: How many times to run the target per example. LLMs are
+            stochastic, so >1 yields a distribution of outputs per example
+            instead of a point estimate. Each repeat becomes its own
+            ``Trial`` tagged with ``replicate``.
+    """
 
     name: str
     target: TargetFunction
     prompt_template: str
     config: LMConfig
+    repeats: int = 1
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +302,9 @@ class LLMJudgeMetric:
             optional output schema).
         prompt_template: Jinja-style template the judge renders before
             calling the model. Defaults to ``default_judge_template``.
+        repeats: how many times to run the judge per trial. Captures judge
+            stochasticity independently from target stochasticity. Each repeat
+            becomes its own ``Scoring`` tagged with ``replicate``.
     """
 
     name: str
@@ -297,6 +313,7 @@ class LLMJudgeMetric:
     scorer: LLMJudgeScorer
     config: LMConfig
     prompt_template: str = default_judge_template
+    repeats: int = 1
 
 
 Metric = ProgrammaticMetric | LLMJudgeMetric
@@ -321,12 +338,16 @@ class SuccessfulTrial:
     ``lmdk.observe`` around the target call: they hold the final rendered
     prompt + kwargs and the raw LM response (latency, tokens, finish reason,
     etc.). They are ``None`` only if the target performed no completion.
+
+    ``replicate`` is the 0-indexed repeat number; with
+    ``Experiment.repeats=1`` (default) it is always ``0``.
     """
 
     example: Example
     output: Any
     request: CompletionRequest | None = None
     response: CompletionResponse | None = None
+    replicate: int = 0
 
     @property
     def rendered_prompt(self) -> str:
@@ -344,6 +365,7 @@ class FailedTrial:
 
     example: Example
     error: Exception
+    replicate: int = 0
 
 
 Trial = SuccessfulTrial | FailedTrial
@@ -368,6 +390,7 @@ class SuccessfulScoring:
     trial: Trial
     metric: Metric
     score: Score
+    replicate: int = 0
 
 
 @dataclass(frozen=True)
@@ -380,6 +403,7 @@ class FailedScoring:
     trial: Trial
     metric: Metric
     error: Exception
+    replicate: int = 0
 
 
 Scoring = SuccessfulScoring | FailedScoring
