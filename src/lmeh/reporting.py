@@ -1,6 +1,6 @@
 """Utilities to report experiment results."""
 
-from lmeh.datatypes import RunResults
+from lmeh.datatypes import Aggregate, RunResults
 
 
 def markdown_report(results: RunResults) -> str:
@@ -15,6 +15,7 @@ def markdown_report(results: RunResults) -> str:
     lines.append("## Experiment")
     lines.append("")
     lines.append(f"- **Model**: `{results.experiment.config.model}`")
+    lines.append(f"- **Target repeats**: {results.experiment.repeats}")
     lines.append(f"- **Run timestamp**: {results.run.timestamp.isoformat()}")
     if results.run.version is not None:
         lines.append(f"- **Version**: `{results.run.version}`")
@@ -24,20 +25,28 @@ def markdown_report(results: RunResults) -> str:
     lines.append("## Quality")
     lines.append("")
     lines.append(
-        "Mean normalized score across every successful scoring (higher is better, in `[0, 1]`)."
+        "Headline score is the mean across per-metric means (each metric "
+        "weighted equally). Dispersion is reported as `mean ± sd (n)`."
     )
     lines.append("")
-    lines.append(f"- **Mean normalized score**: {results.mean_normalized:.4f}")
+    lines.append(f"- **Overall**: {_fmt(results.overall)}")
     lines.append("")
 
     per_metric = results.per_metric()
     if per_metric:
-        lines.append("### Per-metric mean normalized score")
+        noise = results.replicate_noise()
+        lines.append("### Per-metric")
         lines.append("")
-        lines.append("| Metric | Mean normalized |")
-        lines.append("| --- | --- |")
+        lines.append(
+            "`Score` aggregates per-example means (dispersion = dataset "
+            "heterogeneity). `Replicate noise` is the average within-cell "
+            "SD across replicates (dispersion = measurement instability)."
+        )
+        lines.append("")
+        lines.append("| Metric | Score | Replicate noise |")
+        lines.append("| --- | --- | --- |")
         for name in sorted(per_metric):
-            lines.append(f"| `{name}` | {per_metric[name]:.4f} |")
+            lines.append(f"| `{name}` | {_fmt(per_metric[name])} | {_fmt(noise[name])} |")
         lines.append("")
 
     # Reliability
@@ -62,10 +71,15 @@ def markdown_report(results: RunResults) -> str:
     # Telemetry
     lines.append("## Telemetry")
     lines.append("")
-    lines.append("Averages across successful trials only.")
+    lines.append("Totals across successful trials only.")
     lines.append("")
-    lines.append(f"- **Mean latency**: {results.mean_latency:.3f} s")
-    lines.append(f"- **Mean output tokens**: {results.mean_output_tokens:.1f}")
-    lines.append(f"- **Total output tokens**: {results.total_output_tokens}")
+    lines.append(f"- **Total latency**: {results.latency:.3f} s")
+    lines.append(f"- **Total output tokens**: {results.output_tokens}")
+    lines.append(f"- **Throughput**: {results.speed:.1f} tok/s")
 
     return "\n".join(lines)
+
+
+def _fmt(agg: Aggregate) -> str:
+    """Render an ``Aggregate`` as ``mean ± sd (n=...)``."""
+    return f"{agg.mean:.4f} ± {agg.sd:.4f} (n={agg.n})"

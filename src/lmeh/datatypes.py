@@ -441,19 +441,33 @@ class RunInfo:
     version: str | None = None  # can be a commit sha, a tag, ...
 
 
+@dataclass(frozen=True)
+class Aggregate:
+    """Summary statistics over a set of values.
+
+    Used wherever a single number would hide useful dispersion. ``sd`` is
+    the sample standard deviation (``n-1`` denominator); it is ``0.0`` when
+    ``n <= 1``, since dispersion is undefined with a single observation.
+    """
+
+    mean: float
+    sd: float
+    n: int
+
+
 @dataclass
 class RunResults:
     """Summary of one experiment run across a whole dataset.
 
     Results are stored along two parallel axes:
 
-    - ``trials``: one entry per example. Telemetry aggregates (latency,
-      output tokens) iterate this list so an example evaluated by N metrics
-      is not overcounted.
-    - ``scorings``: one entry per (trial, metric) pair. Failed trials
-      contribute zero scores (the target is what's under evaluation);
-      scorer errors contribute entries with ``error`` set and are excluded
-      from quality aggregates.
+    - ``trials``: one entry per ``(example, target-replicate)``. Telemetry
+      iterates this list so an example evaluated by N metrics is not
+      overcounted.
+    - ``scorings``: one entry per ``(trial, metric, judge-replicate)``.
+      Failed trials contribute sentinel zero scores (the target is what's
+      under evaluation); scorer errors contribute ``FailedScoring`` entries
+      and are excluded from quality aggregates.
 
     Telemetry aggregates skip failed trials (those with no ``response``).
     """
@@ -463,73 +477,149 @@ class RunResults:
     trials: list[Trial]
     scorings: list[Scoring]
 
+    # ------------------------------------------------------------------
+    # Raw accessors
+    # ------------------------------------------------------------------
+
     @property
     def successful_trials(self) -> list[SuccessfulTrial]:
-        """List of trials executed without errors."""
+        """Which trials executed without raising?"""
         return [t for t in self.trials if isinstance(t, SuccessfulTrial)]
 
     @property
     def successful_responses(self) -> list[CompletionResponse]:
-        """Raw LM responses from successful trials."""
+        """What raw LM responses came back from successful trials?"""
         return [t.response for t in self.successful_trials if t.response is not None]
 
     @property
+    def successful_scorings(self) -> list[SuccessfulScoring]:
+        """Which scorings produced a score (no scorer crash)?"""
+        return [r for r in self.scorings if isinstance(r, SuccessfulScoring)]
+
+    # ------------------------------------------------------------------
+    # Reliability
+    # ------------------------------------------------------------------
+
+    @property
     def failure_rate(self) -> float:
-        """Fraction of trials that errored out, in ``[0, 1]``."""
+        """What fraction of target invocations crashed?"""
         return 1.0 - len(self.successful_trials) / len(self.trials) if self.trials else 0.0
 
     @property
-    def successful_scorings(self) -> list[SuccessfulScoring]:
-        """Scorings that produced a score (excludes scorer errors)."""
-        return [r for r in self.scorings if isinstance(r, SuccessfulScoring)]
-
-    @property
-    def mean_normalized(self) -> float:
-        """Average normalized score across every successful scoring."""
-        return _mean(r.score.normalized for r in self.successful_scorings)
-
-    def per_example(self) -> dict[int, float]:
-        """Return mean normalized score per example, keyed by ``id(example)``."""
-        scored = self.successful_scorings
-        return {
-            id(ex): _mean(r.score.normalized for r in scored if r.trial.example is ex)
-            for ex in {id(r.trial.example): r.trial.example for r in scored}.values()
-        }
-
-    def per_metric(self) -> dict[str, float]:
-        """Return mean normalized score per metric, keyed by metric name."""
-        scored = self.successful_scorings
-        names = {r.metric.name for r in scored}
-        return {
-            name: _mean(r.score.normalized for r in scored if r.metric.name == name)
-            for name in names
-        }
-
-    @property
     def scoring_failure_rate(self) -> float:
-        """Fraction of scorings where the scorer itself errored, in ``[0, 1]``."""
+        """What fraction of scorings crashed in the scorer itself?"""
         if not self.scorings:
             return 0.0
         errors = sum(1 for r in self.scorings if isinstance(r, FailedScoring))
         return errors / len(self.scorings)
 
-    @property
-    def mean_latency(self) -> float:
-        """Average wall-clock latency across successful trials, in seconds."""
-        return _mean(r.latency for r in self.successful_responses)
+    # ------------------------------------------------------------------
+    # Quality
+    # ------------------------------------------------------------------
 
     @property
-    def mean_output_tokens(self) -> float:
-        """Average output token count across successful trials."""
-        return _mean(r.output_tokens for r in self.successful_responses)
+    def overall(self) -> Aggregate:
+        """What's the headline score for the whole run, with dispersion?
+
+        Aggregated over per-metric means so every metric carries equal
+        weight regardless of how many replicates or examples it has.
+        ``n`` is the number of metrics that produced at least one score.
+        """
+        return _aggregate(agg.mean for agg in self.per_metric().values())
+
+    def per_example(self) -> dict[int, Aggregate]:
+        """How does each example score, aggregated across metrics and replicates?
+
+        Keyed by ``id(example)``. The mean pools every normalized score
+        recorded for the example; useful to spot hard examples, but mixes
+        heterogeneous metrics so interpret the dispersion with care.
+        """
+        scored = self.successful_scorings
+        examples = {id(r.trial.example): r.trial.example for r in scored}
+        return {
+            ex_id: _aggregate(r.score.normalized for r in scored if r.trial.example is ex)
+            for ex_id, ex in examples.items()
+        }
+
+    def per_metric(self) -> dict[str, Aggregate]:
+        """How does each metric score across the dataset, aggregated across examples and replicates?
+
+        Aggregated over per-example means so every example carries equal
+        weight. The resulting ``sd`` measures **dataset heterogeneity** for
+        the metric (how much examples differ), not measurement noise — see
+        :meth:`replicate_noise` for that.
+        """
+        per_cell = self.per_example_and_metric()
+        by_metric: dict[str, list[float]] = {}
+        for (_ex_id, metric_name), agg in per_cell.items():
+            by_metric.setdefault(metric_name, []).append(agg.mean)
+        return {name: _aggregate(means) for name, means in by_metric.items()}
+
+    def per_example_and_metric(self) -> dict[tuple[int, str], Aggregate]:
+        """What's the score for each (example, metric) cell, aggregated across replicates only?
+
+        The atomic unit of dispersion: ``sd`` here is pure measurement
+        noise (target sampling x judge sampling) for one cell, with no
+        dataset or metric mixing. Keyed by ``(id(example), metric.name)``.
+        """
+        cells: dict[tuple[int, str], list[float]] = {}
+        for r in self.successful_scorings:
+            key = (id(r.trial.example), r.metric.name)
+            cells.setdefault(key, []).append(r.score.normalized)
+        return {key: _aggregate(vals) for key, vals in cells.items()}
+
+    def replicate_noise(self) -> dict[str, Aggregate]:
+        """How noisy is each metric's measurement, on average?
+
+        For each metric, takes the per-cell ``sd`` from
+        :meth:`per_example_and_metric` and aggregates across examples. The
+        resulting ``mean`` is the metric's **noise floor**; large values
+        suggest bumping ``repeats`` or swapping the judge. Distinct from
+        :meth:`per_metric` ``.sd``, which measures dataset heterogeneity.
+        """
+        per_cell = self.per_example_and_metric()
+        by_metric: dict[str, list[float]] = {}
+        for (_ex_id, metric_name), agg in per_cell.items():
+            by_metric.setdefault(metric_name, []).append(agg.sd)
+        return {name: _aggregate(sds) for name, sds in by_metric.items()}
+
+    # ------------------------------------------------------------------
+    # Telemetry
+    # ------------------------------------------------------------------
 
     @property
-    def total_output_tokens(self) -> int:
-        """Total output tokens consumed by successful trials."""
+    def latency(self) -> float:
+        """How much compute time did target calls consume in total, in seconds?
+
+        Sum of per-trial latencies — equivalent to serial wall-clock,
+        independent of how many workers actually ran the experiment.
+        """
+        return sum(r.latency for r in self.successful_responses)
+
+    @property
+    def output_tokens(self) -> int:
+        """How many output tokens did the run produce in total?"""
         return sum(r.output_tokens for r in self.successful_responses)
 
+    @property
+    def speed(self) -> float:
+        """What's the average target throughput in output tokens per second?"""
+        lat = self.latency
+        return self.output_tokens / lat if lat > 0 else 0.0
 
-def _mean(values) -> float:
-    """Return the arithmetic mean of ``values``, or ``0.0`` if empty."""
-    values = list(values)
-    return sum(values) / len(values) if values else 0.0
+
+def _aggregate(values) -> Aggregate:
+    """Return mean, sample SD and count for ``values``.
+
+    Empty input yields ``Aggregate(0.0, 0.0, 0)``; single-element input
+    yields ``sd=0.0``.
+    """
+    vals = list(values)
+    n = len(vals)
+    if n == 0:
+        return Aggregate(mean=0.0, sd=0.0, n=0)
+    m = sum(vals) / n
+    if n == 1:
+        return Aggregate(mean=m, sd=0.0, n=1)
+    var = sum((v - m) ** 2 for v in vals) / (n - 1)
+    return Aggregate(mean=m, sd=var**0.5, n=n)
