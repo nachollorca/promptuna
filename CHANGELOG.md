@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-05-24)
+
+### Features
+
+- Add dispersion aggregates in RunResults
+  ([`4f8117e`](https://github.com/nachollorca/lmeh/commit/4f8117e89a21ab4b38517c461c69166d17b698e2))
+
+
 ## v1.5.0 (2026-05-23)
 
 ### Documentation
