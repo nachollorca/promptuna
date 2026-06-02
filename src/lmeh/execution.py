@@ -18,7 +18,6 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from lmdk import observe
 
 from .datatypes import (
-    Dataset,
     Example,
     Experiment,
     FailedScoring,
@@ -40,18 +39,18 @@ from .datatypes import (
 
 def run_experiment(
     experiment: Experiment,
-    dataset: Dataset,
+    examples: list[Example],
     metrics: list[Metric],
     workers: int = 1,
 ) -> RunResults:
-    """Run ``experiment`` over ``dataset`` and score every ``metric``.
+    """Run ``experiment`` over ``examples`` and score every ``metric``.
 
     Blocks until the whole run is done. For incremental consumption use
     :func:`stream_experiment`.
     """
     trials: list[Trial] = []
     scorings: list[Scoring] = []
-    for item in stream_experiment(experiment, dataset, metrics, workers=workers):
+    for item in stream_experiment(experiment, examples, metrics, workers=workers):
         if isinstance(item, (SuccessfulTrial, FailedTrial)):
             trials.append(item)
         else:
@@ -66,7 +65,7 @@ def run_experiment(
 
 def stream_experiment(
     experiment: Experiment,
-    dataset: Dataset,
+    examples: list[Example],
     metrics: list[Metric],
     workers: int = 1,
 ) -> Iterator[Trial | Scoring]:
@@ -77,17 +76,17 @@ def stream_experiment(
 
     The same thread pool is shared between target calls and LLM-judge
     scorers so workers stay saturated: scoring for an example starts as soon
-    as its trial completes, without waiting for the rest of the dataset.
+    as its trial completes, without waiting for the rest of the examples.
     Programmatic scorers run inline on the consumer thread (they are
     cheap and not I/O-bound).
     """
-    _validate_run(experiment=experiment, dataset=dataset, metrics=metrics)
+    _validate_run(experiment=experiment, examples=examples, metrics=metrics)
 
-    if not dataset:
+    if not examples:
         return
 
     with ThreadPoolExecutor(max_workers=max(workers, 1)) as pool:
-        trial_futures = _submit_trials(pool, experiment, dataset)
+        trial_futures = _submit_trials(pool, experiment, examples)
         score_futures: list[Future[Scoring]] = []
 
         for fut in as_completed(trial_futures):
@@ -102,7 +101,7 @@ def stream_experiment(
 def _submit_trials(
     pool: ThreadPoolExecutor,
     experiment: Experiment,
-    dataset: Dataset,
+    examples: list[Example],
 ) -> dict[Future[Trial], Example]:
     """Submit one trial future per ``(example, replicate)`` pair."""
     return {
@@ -114,7 +113,7 @@ def _submit_trials(
             ex,
             replicate=r,
         ): ex
-        for ex in dataset
+        for ex in examples
         for r in range(experiment.repeats)
     }
 
@@ -215,7 +214,7 @@ def score_metric(trial: Trial, metric: Metric, replicate: int = 0) -> Scoring:
 
 def _validate_run(
     experiment: Experiment,
-    dataset: Dataset,
+    examples: list[Example],
     metrics: list[Metric],
 ) -> None:
     """Preflight checks. Raise ``ValueError`` on the first problem found.
@@ -223,19 +222,19 @@ def _validate_run(
     Catches configuration mistakes cheaply, before any LM call is made.
     Does not perform any network I/O.
     """
-    _validate_dataset(dataset)
+    _validate_examples(examples)
     _validate_metrics(metrics)
     _validate_experiment(experiment)
 
 
-def _validate_dataset(dataset: Dataset) -> None:
-    if not dataset:
-        raise ValueError("dataset is empty")
+def _validate_examples(examples: list[Example]) -> None:
+    if not examples:
+        raise ValueError("examples is empty")
 
-    has_ref = [ex.reference is not None for ex in dataset]
+    has_ref = [ex.reference is not None for ex in examples]
     if any(has_ref) and not all(has_ref):
         raise ValueError(
-            "dataset mixes examples with and without `reference`; "
+            "examples mix rows with and without `reference`; "
             "make this all-or-nothing so reference-dependent metrics are unambiguous"
         )
 
