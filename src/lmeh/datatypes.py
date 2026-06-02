@@ -2,7 +2,7 @@
 
 Conceptual flow:
 
-    Dataset -> Example
+    list[Example] -> Example
     Experiment = TargetFunction + prompt_template + LMConfig
     Trial = result of running one Experiment on one Example
     Metric = what we want to measure
@@ -50,10 +50,6 @@ class Example:
 
     inputs: dict[str, Any]
     reference: Any | None = None
-
-
-Dataset = list[Example]
-"""A dataset is a simple iterator of examples. In the future can contain metadata and splits."""
 
 
 @dataclass
