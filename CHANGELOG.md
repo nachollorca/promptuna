@@ -2,6 +2,59 @@
 
 <!-- version list -->
 
+## v1.7.0 (2026-06-10)
+
+### Code Style
+
+- Little comments and style changes
+  ([`e9308dc`](https://github.com/nachollorca/lmeh/commit/e9308dc470b1dd60c98edddeca266d0509638d31))
+
+- Remove keyword-only separators
+  ([`4d4ad62`](https://github.com/nachollorca/lmeh/commit/4d4ad62aa4cf9000af575703031fd88b1b95313b))
+
+- **optimizer**: Use alias for nested output types
+  ([`485c875`](https://github.com/nachollorca/lmeh/commit/485c875d57a77546e4ac2426b29d5dac90a50b67))
+
+### Continuous Integration
+
+- **gitignore**: Ignore notebooks
+  ([`56ccecd`](https://github.com/nachollorca/lmeh/commit/56ccecd90fb2558849d92b50d8617b25b2bdf6bb))
+
+### Documentation
+
+- Clear up readme
+  ([`5eefbdb`](https://github.com/nachollorca/lmeh/commit/5eefbdbfd90041aeed077883ba6cdeb3f5898192))
+
+- **notebook**: Add optimization example
+  ([`7bed3dc`](https://github.com/nachollorca/lmeh/commit/7bed3dc0a586dabf779ce012c82cb39e6f31f579))
+
+- **notebook**: Add telemetry to the notebook
+  ([`4f50ede`](https://github.com/nachollorca/lmeh/commit/4f50ede605773236820388a86c5e342e124b537b))
+
+- **notebook**: Make the getting started notebook a first class citizen, use jupyter instead of
+  marimo
+  ([`f3cacf2`](https://github.com/nachollorca/lmeh/commit/f3cacf2b5bea6dce00f90ca699e5dbce83a7f057))
+
+- **notebook**: Replace marimo with ipynb because we can render it in github
+  ([`8882591`](https://github.com/nachollorca/lmeh/commit/88825919474565624c7eecc5a879dc3bfe0f0d51))
+
+### Features
+
+- Actually do the largest part of the implementation
+  ([`fee6808`](https://github.com/nachollorca/lmeh/commit/fee68084119490610fc98c533aa4a407e36fdfc9))
+
+- **optimizer**: Write initial sketch
+  ([`2e2633f`](https://github.com/nachollorca/lmeh/commit/2e2633f241149a4c9074e3cca4cacf6ecf676379))
+
+### Refactoring
+
+- **datatypes**: Remove Dataset alias because it was misleading
+  ([`f1fdec7`](https://github.com/nachollorca/lmeh/commit/f1fdec777c1083aa3912d1ab4d4a96d824a040fc))
+
+- **optimizer**: Reduce cyclomatic complexity
+  ([`0213f7f`](https://github.com/nachollorca/lmeh/commit/0213f7fa9b0567d00b06a74bc3debb74c25ecaee))
+
+
 ## v1.6.0 (2026-05-24)
 
 ### Features
