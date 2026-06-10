@@ -98,40 +98,62 @@ def render_history(steps: list[Step]) -> str:
     return "\n\n".join(blocks)
 
 
-# I think we should actually also show the results per-metric
-# Even though the best checkpoint is clearly defined by the overall mean
-# It could help the model correct the prompt (just like the worst examples)
-# Or are we doing this already?
-def _render_step(step: Step, index: int, baseline_score: float, *, is_best: bool) -> str:
-    """Render a single checkpoint block for :func:`render_history`."""
+def _signed(delta: float) -> str:
+    """Format a score delta with an explicit sign, e.g. ``+0.0900`` / ``-0.0100``."""
+    return f"{delta:+.4f}"
+
+
+def _step_header(step: Step, index: int, baseline_score: float, *, is_best: bool) -> str:
+    """Build the checkpoint header line for :func:`_render_step`."""
     label = "baseline" if index == 0 else f"candidate {index}"
     marker = " ★ best so far" if is_best else ""
     header = f"=== Step {index} ({label}){marker} | score {step.score:.4f}"
     if index > 0:
         header += f" ({_signed(step.score - baseline_score)} vs baseline)"
-    header += " ==="
+    return header + " ==="
 
-    lines = [header, "", "Per-metric:"]
-    per_metric = step.result.per_metric()
-    if per_metric:
-        for name in sorted(per_metric):
-            lines.append(f"  - {name}: {per_metric[name].mean:.4f}")
-    else:
+
+def _per_metric_lines(result: RunResults) -> list[str]:
+    """Render per-metric score lines for a checkpoint."""
+    lines = ["Per-metric:"]
+    per_metric = result.per_metric()
+    if not per_metric:
         lines.append("  (no scores)")
+        return lines
+    for name in sorted(per_metric):
+        lines.append(f"  - {name}: {per_metric[name].mean:.4f}")
+    return lines
 
-    lines += ["", "Prompt:", step.prompt_template]
 
-    weak = _weakest_examples(step.result, _MAX_WEAK_EXAMPLES)
-    if weak:
-        lines += ["", "Weakest examples:"]
-        for example, mean_score, breakdown in weak:
-            lines.append(f"  - inputs={example.inputs!r} | mean {mean_score:.4f}")
-            for metric_name, normalized, reason in breakdown:
-                detail = f"      {metric_name}: {normalized:.4f}"
-                if reason:
-                    detail += f" — {reason}"
-                lines.append(detail)
+def _weak_examples_lines(result: RunResults) -> list[str]:
+    """Render weakest-example detail lines for a checkpoint."""
+    weak = _weakest_examples(result, _MAX_WEAK_EXAMPLES)
+    if not weak:
+        return []
+    lines = ["Weakest examples:"]
+    for example, mean_score, breakdown in weak:
+        lines.append(f"  - inputs={example.inputs!r} | mean {mean_score:.4f}")
+        for metric_name, normalized, reason in breakdown:
+            detail = f"      {metric_name}: {normalized:.4f}"
+            if reason:
+                detail += f" — {reason}"
+            lines.append(detail)
+    return lines
 
+
+def _render_step(step: Step, index: int, baseline_score: float, *, is_best: bool) -> str:
+    """Render a single checkpoint block for :func:`render_history`."""
+    lines = [
+        _step_header(step, index, baseline_score, is_best=is_best),
+        "",
+        *_per_metric_lines(step.result),
+        "",
+        "Prompt:",
+        step.prompt_template,
+    ]
+    weak_lines = _weak_examples_lines(step.result)
+    if weak_lines:
+        lines += ["", *weak_lines]
     return "\n".join(lines)
 
 
@@ -159,11 +181,6 @@ def _weakest_examples(
 
     ranked.sort(key=lambda entry: entry[1])
     return ranked[:limit]
-
-
-def _signed(delta: float) -> str:
-    """Format a score delta with an explicit sign, e.g. ``+0.0900`` / ``-0.0100``."""
-    return f"{delta:+.4f}"
 
 
 # ---------------------------------------------------------------------------
