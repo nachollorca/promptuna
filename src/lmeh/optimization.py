@@ -157,35 +157,30 @@ def _render_step(step: Step, index: int, baseline_score: float, is_best: bool) -
     return "\n".join(lines)
 
 
-# The output hint of this function seems convoluted
-# wouldn't it make sense to make a little dataclass for it?
-def _weakest_examples(
-    result: RunResults, limit: int
-) -> list[tuple[Example, float, list[tuple[str, float, str]]]]:
+MetricBreakdown = tuple[str, float, str]
+WeakExampleEntry = tuple[Example, float, list[MetricBreakdown]]
+
+
+def _weakest_examples(result: RunResults, limit: int) -> list[WeakExampleEntry]:
     """Return the ``limit`` lowest-scoring examples with their per-metric detail.
 
     Each entry is ``(example, mean_normalized, [(metric, normalized, reason)])``,
     sorted worst-first. Examples are pooled across metrics and replicates by
     ``id(example)``, mirroring ``RunResults.per_example``.
     """
-    grouped: dict[int, tuple[Example, list[tuple[str, float, str]]]] = {}
+    grouped: dict[int, tuple[Example, list[MetricBreakdown]]] = {}
     for scoring in result.successful_scorings:
         example = scoring.trial.example
         _, breakdown = grouped.setdefault(id(example), (example, []))
         breakdown.append((scoring.metric.name, scoring.score.normalized, scoring.score.reason))
 
-    ranked: list[tuple[Example, float, list[tuple[str, float, str]]]] = []
+    ranked: list[WeakExampleEntry] = []
     for example, breakdown in grouped.values():
         mean_score = sum(n for _, n, _ in breakdown) / len(breakdown)
         ranked.append((example, mean_score, breakdown))
 
     ranked.sort(key=lambda entry: entry[1])
     return ranked[:limit]
-
-
-# ---------------------------------------------------------------------------
-# Default proposer
-# ---------------------------------------------------------------------------
 
 
 default_proposer_template = """
@@ -220,9 +215,7 @@ class _ProposedTemplate(BaseModel):
 
 
 def default_proposer(
-    steps: list[Step],
-    config: LMConfig,
-    template: str = default_proposer_template,
+    steps: list[Step], config: LMConfig, template: str = default_proposer_template
 ) -> str:
     """Render the trajectory and ask the model for a better template.
 
@@ -248,11 +241,6 @@ def default_proposer(
     parsed = response.parsed
     assert parsed is not None, "proposer model returned no structured output"
     return parsed.prompt_template
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 
 def optimize(
@@ -301,7 +289,7 @@ def optimize(
     archive = [Step(prompt_template=experiment.prompt_template, result=baseline)]
 
     for _ in range(steps):
-        candidate = proposer(archive, proposer_config)
+        candidate = proposer(steps=archive, config=proposer_config)
         candidate_experiment = replace(experiment, prompt_template=candidate)
         result = run_experiment(
             experiment=candidate_experiment, examples=examples, metrics=metrics, workers=workers
