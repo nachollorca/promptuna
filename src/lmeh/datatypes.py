@@ -93,7 +93,6 @@ class TargetFunction(Protocol):
 
     def __call__(  # noqa: D102
         self,
-        *,
         prompt_template: str,
         config: LMConfig,
         **inputs: Any,

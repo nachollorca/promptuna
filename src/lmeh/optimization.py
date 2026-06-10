@@ -103,7 +103,7 @@ def _signed(delta: float) -> str:
     return f"{delta:+.4f}"
 
 
-def _step_header(step: Step, index: int, baseline_score: float, *, is_best: bool) -> str:
+def _step_header(step: Step, index: int, baseline_score: float, is_best: bool) -> str:
     """Build the checkpoint header line for :func:`_render_step`."""
     label = "baseline" if index == 0 else f"candidate {index}"
     marker = " ★ best so far" if is_best else ""
@@ -141,7 +141,7 @@ def _weak_examples_lines(result: RunResults) -> list[str]:
     return lines
 
 
-def _render_step(step: Step, index: int, baseline_score: float, *, is_best: bool) -> str:
+def _render_step(step: Step, index: int, baseline_score: float, is_best: bool) -> str:
     """Render a single checkpoint block for :func:`render_history`."""
     lines = [
         _step_header(step, index, baseline_score, is_best=is_best),
@@ -213,8 +213,6 @@ Return the complete prompt template, ready to use as-is.
 """.strip()
 
 
-# I am not sure this is a good idea vs. simply have the model output the new template
-# in a string
 class _ProposedTemplate(BaseModel):
     """Structured-output schema for :func:`default_proposer`."""
 
@@ -224,7 +222,6 @@ class _ProposedTemplate(BaseModel):
 def default_proposer(
     steps: list[Step],
     config: LMConfig,
-    *,  # Why this?
     template: str = default_proposer_template,
 ) -> str:
     """Render the trajectory and ask the model for a better template.
@@ -262,10 +259,9 @@ def optimize(
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
-    *,  # Why this?
-    proposer: Proposer = default_proposer,
     proposer_config: LMConfig,
     steps: int,
+    proposer: Proposer = default_proposer,
     workers: int = 1,
 ) -> OptimizationResult:
     """Search for a prompt template that scores better on ``examples``.
