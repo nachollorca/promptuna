@@ -45,3 +45,5 @@ run file:
     uv run --env-file .env {{ file }}
 
 # Project specific commands ---------------------------------------------------
+notebook:
+    uv run jupyter lab

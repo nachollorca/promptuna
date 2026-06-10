@@ -53,7 +53,7 @@ class Example:
 
 
 @dataclass
-class LMConfig:
+class LMConfig:  # I am not sure if this is the best name. Maybe we can run with LM alone or Model
     """How to invoke a language model.
 
     Uniform across target, judge, and (future) optimizer call sites — none
@@ -93,7 +93,6 @@ class TargetFunction(Protocol):
 
     def __call__(  # noqa: D102
         self,
-        *,
         prompt_template: str,
         config: LMConfig,
         **inputs: Any,
