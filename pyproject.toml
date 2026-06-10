@@ -17,6 +17,7 @@ dev = [
     "complexipy",
     "ipykernel>=7.2.0",
     "jupyter>=1.1.1",
+    "logfire>=4.36.0",
     "pytest>=9.0.3",
     "pytest-cov",
     "ruff",
