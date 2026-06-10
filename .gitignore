@@ -63,3 +63,6 @@ Thumbs.db
 
 # notes
 scratchpad.md
+
+# notebooks
+.ipynb_checkpoints*
