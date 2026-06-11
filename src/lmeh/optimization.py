@@ -15,7 +15,7 @@ from dataclasses import replace
 from typing import Protocol
 
 from lmdk import complete, render_template
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from lmeh.datatypes import Example, Experiment, LMConfig, Metric, OptimizationResult, Step
 from lmeh.execution import run_experiment
@@ -39,13 +39,8 @@ Each metric is normalized to [0, 1] and combined into a single headline score (h
 
 We are searching for a prompt template that maximizes that headline score.
 
-Below is the full optimization trajectory in chronological order, formatted as
-markdown. Each `## Step N` heading carries the step's role (baseline or
-candidate), its headline score, and — for candidates — its delta versus the
-baseline; the best step so far is marked `⭐ best`. Under each heading you get
-the per-metric quality breakdown (with dispersion and replicate noise),
-reliability, and a sample of the weakest examples with the judge's reasoning.
-The exact template that produced each step follows in a `<template>` block.
+Below is the full optimization trajectory in chronological order. A legend at the top
+explains how to read the scores and sections.
 
 {{ HISTORY }}
 
@@ -60,6 +55,9 @@ Return the complete prompt template, ready to use as-is.
 class _ProposedTemplate(BaseModel):
     """Structured-output schema for :func:`default_proposer`."""
 
+    thinking: str = Field(
+        description="What seems to work? What is the error analysis? What could be improved?"
+    )
     prompt_template: str
 
 

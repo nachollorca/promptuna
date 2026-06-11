@@ -41,14 +41,38 @@ def _weakest_examples(result: RunResults, limit: int) -> list[WeakExampleEntry]:
     return ranked[:limit]
 
 
+def _render_legend(*, trajectory: bool = False) -> str:
+    """Render score semantics and section conventions once per report or trajectory."""
+    lines = [
+        "Headline score is the mean across per-metric means (each metric weighted equally).",
+        "",
+        "Each quality table cell is `mean ± sd (n)`. `Score` aggregates per-example "
+        "means (dispersion = dataset heterogeneity); `Replicate noise` is the average "
+        "within-cell SD across replicates (dispersion = measurement instability).",
+        "",
+        "Trial failures count against the run (the target is under evaluation); "
+        "scorer failures are excluded from quality aggregates.",
+    ]
+    if trajectory:
+        lines.extend(
+            [
+                "",
+                "Each `## Step N` heading shows role (baseline or candidate), headline score, "
+                "delta vs baseline (candidates only), and `⭐ best` on the winning step so far.",
+                "",
+                "Each step opens with the verbatim template in a `<template>` block, then the "
+                "quality, reliability, and weak-example results it produced.",
+            ]
+        )
+    return "\n".join(lines)
+
+
 def _render_quality(results: RunResults) -> str:
     """Render the quality section for a single run."""
     overall = results.overall
     metric_label = "metric" if overall.n == 1 else "metrics"
     lines = [
         "### Quality",
-        "",
-        "Headline score is the mean across per-metric means (each metric weighted equally).",
         "",
         f"- **Overall**: {overall.mean:.2f} ({overall.n} {metric_label})",
     ]
@@ -58,11 +82,6 @@ def _render_quality(results: RunResults) -> str:
         noise = results.replicate_noise()
         lines.extend(
             [
-                "",
-                "Each cell is `mean ± sd (n)`. `Score` aggregates per-example "
-                "means (dispersion = dataset heterogeneity); `Replicate noise` "
-                "is the average within-cell SD across replicates (dispersion = "
-                "measurement instability).",
                 "",
                 "| Metric | Score | Replicate noise |",
                 "| --- | --- | --- |",
@@ -79,9 +98,6 @@ def _render_reliability(results: RunResults) -> str:
     return "\n".join(
         [
             "### Reliability",
-            "",
-            "Trial failures count against the run (the target is under "
-            "evaluation); scorer failures are excluded from quality aggregates.",
             "",
             f"- **Trials**: {len(results.successful_trials)} successful / "
             f"{len(results.trials)} total",
@@ -127,22 +143,28 @@ def _render_telemetry(results: RunResults) -> str:
     )
 
 
-def render_run(results: RunResults, *, telemetry: bool = True) -> str:
+def render_run(results: RunResults, *, telemetry: bool = True, legend: bool = True) -> str:
     """Render a single run as markdown sections.
 
     Args:
         results: The run to render.
         telemetry: When ``False``, omit the telemetry section (optimizer context).
+        legend: When ``True``, prepend score semantics before the sections.
 
     Returns:
         Markdown with quality, reliability, and weak examples; telemetry is
         included when ``telemetry=True``.
     """
-    sections = [
-        _render_quality(results),
-        _render_reliability(results),
-        _render_weak_examples(results),
-    ]
+    sections: list[str] = []
+    if legend:
+        sections.append(_render_legend())
+    sections.extend(
+        [
+            _render_quality(results),
+            _render_reliability(results),
+            _render_weak_examples(results),
+        ]
+    )
     if telemetry:
         sections.append(_render_telemetry(results))
     return "\n\n".join(sections)
@@ -167,9 +189,10 @@ def _render_step_heading(step: Step, index: int, baseline_score: float, is_best:
 def render_history(steps: list[Step]) -> str:
     """Render the chronological trajectory into the proposer's context string.
 
-    Pure function over the archive. Each checkpoint is a ``## Step N`` heading
-    with role/score/delta metadata, the shared :func:`render_run` body
-    (without telemetry), and a ``<template>`` block with the exact template.
+    Pure function over the archive. Opens with a one-time legend, then each
+    checkpoint is a ``## Step N`` heading with role/score/delta metadata, a
+    ``<template>`` block with the exact template, and the shared
+    :func:`render_run` body (without telemetry or per-step legends).
 
     Args:
         steps: Chronological archive; ``steps[0]`` is the baseline.
@@ -183,12 +206,21 @@ def render_history(steps: list[Step]) -> str:
     baseline_score = steps[0].score
     best_index = max(range(len(steps)), key=lambda i: steps[i].score)
 
-    blocks: list[str] = []
+    preamble = "\n\n".join(
+        [
+            "## How to read these results",
+            "",
+            _render_legend(trajectory=True),
+        ]
+    )
+
+    step_blocks: list[str] = []
     for i, step in enumerate(steps):
         sections = [
             _render_step_heading(step, i, baseline_score, is_best=i == best_index),
-            render_run(step.result, telemetry=False),
             f"<template>\n{step.prompt_template}\n</template>",
+            render_run(step.result, telemetry=False, legend=False),
         ]
-        blocks.append("\n\n".join(sections))
-    return "\n\n".join(blocks)
+        step_blocks.append("\n\n".join(sections))
+
+    return preamble + "\n\n" + "\n\n---\n\n".join(step_blocks)
