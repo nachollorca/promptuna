@@ -168,6 +168,15 @@ css = [
 ]
 
 [[package]]
+name = "catppuccin-jupyterlab"
+version = "0.2.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a5/10/6d498283c3553dcd21d8a88882672985b141be71115337edc22bd4e78a14/catppuccin_jupyterlab-0.2.5.tar.gz", hash = "sha256:534f61026e741511542cf0b59893778e25ca0845db517afa2d7802136d5e8f9b", size = 1185431, upload-time = "2026-05-26T02:58:18.785Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/33/445cd4ea73fbcd0d4d11f1a15d4cb77334675ffce5732586235bac81a8f0/catppuccin_jupyterlab-0.2.5-py3-none-any.whl", hash = "sha256:779bb16487f7009ec05fd1847d675bffe28c4e2ef10370dff929198150fa0ba6", size = 21868, upload-time = "2026-05-26T02:58:14.534Z" },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.5.20"
 source = { registry = "https://pypi.org/simple" }
@@ -929,7 +938,7 @@ wheels = [
 
 [[package]]
 name = "lmeh"
-version = "1.6.0"
+version = "1.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "lmdk" },
@@ -937,6 +946,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "catppuccin-jupyterlab" },
     { name = "complexipy" },
     { name = "ipykernel" },
     { name = "jupyter" },
@@ -952,6 +962,7 @@ requires-dist = [{ name = "lmdk", specifier = ">=1.8.0" }]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "catppuccin-jupyterlab", specifier = ">=0.2.5" },
     { name = "complexipy" },
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
