@@ -38,11 +38,51 @@ class Proposer(Protocol):
     ) -> str: ...
 
 
-class _ProposedTemplate(BaseModel):
-    """Structured-output schema for :func:`default_proposer`."""
+class Output(BaseModel):
+    """Structured-output schema for :func:`default_proposer`.
 
-    thinking: str = Field(
-        description="What seems to work? What is the error analysis? What could be improved?"
+    Follows the approach explained in Attentive Reasoning Query sequence: https://arxiv.org/pdf/2503.03669
+    """
+
+    reinstate_goal: str = Field(
+        description="Repeat the goal at hand and the given constraints in a clear and concise way."
+    )
+    trajectory_summary: str = Field(
+        description=(
+            "Brief hronological analysis of the archive: baseline score, best checkpoint (⭐), "
+            "which candidates helped or hurt, and the remaining gap to a perfect score."
+        )
+    )
+    failure_analysis: str = Field(
+        description=(
+            "Analyze the weakest examples from the best (or latest) checkpoint. "
+            "Cluster failure modes using judge reasons; infer missing rubric, "
+            "ambiguity, or formatting issues — not generic advice."
+        )
+    )
+    what_works: str = Field(
+        description=(
+            "Concrete patterns in higher-scoring templates or positive deltas "
+            "(instructions, examples, output format, tone). Cite step numbers."
+        )
+    )
+    what_hurts: str = Field(
+        description=(
+            "Patterns correlated with regressions, noise, or scorer confusion. "
+            "Distinguish real harm from replicate noise when possible."
+        )
+    )
+    improvement_hypothesis: str = Field(
+        description=(
+            "One falsifiable theory: 'If we change X, score should improve because Y' "
+            "grounded in failure_analysis and trajectory evidence."
+        )
+    )
+    edit_plan: str = Field(
+        description=(
+            "Specific edits to apply (add/remove/rephrase sections). "
+            "Exploit or explore? Say whether you refine the best step or explore a new approach."
+        )
     )
     prompt_template: str
 
@@ -72,7 +112,7 @@ def default_proposer(
     response = complete(
         model=config.model,
         prompt=prompt,
-        output_schema=_ProposedTemplate,
+        output_schema=Output,
         generation_kwargs=config.generation_kwargs,
     )
     parsed = response.parsed
