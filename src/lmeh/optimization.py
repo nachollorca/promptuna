@@ -12,6 +12,7 @@ checkpoint, so the search may regress without losing the winner.
 """
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Protocol
 
 from lmdk import complete, render_template
@@ -20,6 +21,10 @@ from pydantic import BaseModel, Field
 from lmeh.datatypes import Example, Experiment, LMConfig, Metric, OptimizationResult, Step
 from lmeh.execution import run_experiment
 from lmeh.rendering import render_history
+
+default_proposer_template = (
+    Path(__file__).parent / "prompt_templates" / "optimizer.jinja"
+).read_text()
 
 
 class Proposer(Protocol):
@@ -30,30 +35,6 @@ class Proposer(Protocol):
         steps: list[Step],
         config: LMConfig,
     ) -> str: ...
-
-
-default_proposer_template = """
-We have a function that calls a language model to accomplish a task.
-Its output quality is measured by one or more metrics over a fixed dataset.
-Each metric is normalized to [0, 1] and combined into a single headline score (higher is better).
-
-We are searching for a prompt template that maximizes that headline score.
-
-Below is the full optimization trajectory in chronological order. A legend at the top
-explains how to read the scores and sections.
-
-{{ HISTORY }}
-
-Study the trajectory: infer what changes helped, what hurt, and where the
-current best prompt still fails. Then write an improved prompt template. You may
-refine the best checkpoint or explore a different approach.
-
-Keep every Jinja placeholder (enclosed in double curly braces) from the templates
-above exactly as-is (same names and syntax). Removing or renaming them breaks
-rendering and makes the template unusable.
-
-Return the complete prompt template, ready to use as-is.
-""".strip()
 
 
 class _ProposedTemplate(BaseModel):

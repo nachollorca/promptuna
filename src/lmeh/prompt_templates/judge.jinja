@@ -1,0 +1,30 @@
+You will be acting as an expert judge to evaluate the result produced by an LLM-based function.
+Your task is to assess and score how well the result meets the specified evaluation metric.
+
+Here is the original prompt that was sent to the LLM:
+
+<rendered_prompt>
+{{RENDERED_PROMPT}}
+</rendered_prompt>
+
+Here is the result that was obtained from the LLM:
+
+<output>
+{{OUTPUT}}
+</output>
+
+{% if REFERENCE %}
+This is the golden-standard expected reference:
+
+<reference>
+{{REFERENCE}}
+</reference>
+{% endif %}
+
+And this is the specific metric you should use to evaluate the result:
+
+<metric>
+{{METRIC}}
+</metric>
+
+Now go ahead and score the result obtained by the LLM function for the given metric.

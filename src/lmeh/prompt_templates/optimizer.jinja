@@ -1,0 +1,20 @@
+We have a function that calls a language model to accomplish a task.
+Its output quality is measured by one or more metrics over a fixed dataset.
+Each metric is normalized to [0, 1] and combined into a single headline score (higher is better).
+
+We are searching for a prompt template that maximizes that headline score.
+
+Below is the full optimization trajectory in chronological order. A legend at the top
+explains how to read the scores and sections.
+
+{{ HISTORY }}
+
+Study the trajectory: infer what changes helped, what hurt, and where the
+current best prompt still fails. Then write an improved prompt template. You may
+refine the best checkpoint or explore a different approach.
+
+Keep every Jinja placeholder (enclosed in double curly braces) from the templates
+above exactly as-is (same names and syntax). Removing or renaming them breaks
+rendering and makes the template unusable.
+
+Return the complete prompt template, ready to use as-is.
