@@ -60,7 +60,7 @@ def _render_legend(*, trajectory: bool = False) -> str:
                 "Each `## Step N` heading shows role (baseline or candidate), headline score, "
                 "delta vs baseline (candidates only), and `⭐ best` on the winning step so far.",
                 "",
-                "Each step opens with the verbatim template in a `<template>` block, then the "
+                "Each step opens with the verbatim template in a `template` block, then the "
                 "quality, reliability, and weak-example results it produced.",
             ]
         )

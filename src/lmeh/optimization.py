@@ -48,6 +48,10 @@ Study the trajectory: infer what changes helped, what hurt, and where the
 current best prompt still fails. Then write an improved prompt template. You may
 refine the best checkpoint or explore a different approach.
 
+Keep every Jinja placeholder (enclosed in double curly braces) from the templates
+above exactly as-is (same names and syntax). Removing or renaming them breaks
+rendering and makes the template unusable.
+
 Return the complete prompt template, ready to use as-is.
 """.strip()
 
@@ -78,7 +82,11 @@ def default_proposer(
     Returns:
         The proposed prompt template.
     """
-    prompt = render_template(template=template, HISTORY=render_history(steps))
+    prompt = render_template(
+        template=template,
+        HISTORY=render_history(steps),
+        strip_curly_brackets=False,
+    )
     response = complete(
         model=config.model,
         prompt=prompt,
