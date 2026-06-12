@@ -8,7 +8,8 @@ The search is OPRO-style and free-form. Each step the proposer rewrites the
 template from scratch given the full chronological trajectory, with the best
 checkpoint clearly marked. The objective is fixed to ``RunResults.overall.mean``
 and the budget is a fixed number of steps; the archive keeps the best
-checkpoint, so the search may regress without losing the winner.
+checkpoint, so the search may regress without losing the winner. Proposing
+stops early once a checkpoint scores perfectly (``overall.mean >= 1.0``).
 """
 
 from dataclasses import replace
@@ -98,9 +99,10 @@ def optimize(
     The loop is: evaluate the experiment's current template as the baseline
     (step 0), then for each of ``steps`` iterations render the trajectory, ask
     ``proposer`` for a new template, evaluate it, and append it to the archive.
-    The objective is fixed to ``RunResults.overall.mean`` and there is no early
-    stopping; :attr:`OptimizationResult.best` selects the winner, which need not
-    be the last step.
+    The objective is fixed to ``RunResults.overall.mean``. Proposing stops once
+    a checkpoint reaches a perfect overall score (``>= 1.0``), even if
+    ``steps`` has not been exhausted; :attr:`OptimizationResult.best` selects
+    the winner, which need not be the last step.
 
     Args:
         experiment: Carries the target, the baseline ``prompt_template``, and
@@ -125,6 +127,8 @@ def optimize(
     archive = [Step(prompt_template=experiment.prompt_template, result=baseline)]
 
     for _ in range(steps):
+        if archive[-1].score >= 1.0:
+            break
         candidate = proposer(steps=archive, config=proposer_config)
         candidate_experiment = replace(experiment, prompt_template=candidate)
         result = run_experiment(
