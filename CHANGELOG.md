@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-06-12)
+
+### Documentation
+
+- **readme**: Explain briefly the concepts behind the optimization
+  ([`08c3557`](https://github.com/nachollorca/lmeh/commit/08c35574aaf9d473a96c3b0068eadbec3ddc75bf))
+
+### Features
+
+- **optimizer**: Implement attentive reasoning queries
+  ([`89f81a8`](https://github.com/nachollorca/lmeh/commit/89f81a8d7dd14cdd6963fcb2678d58892a2d3014))
+
+
 ## v1.8.0 (2026-06-12)
 
 ### Documentation
