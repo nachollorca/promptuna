@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-06-12)
+
+### Documentation
+
+- **notebook**: Add a summary story of what we are doing
+  ([`d4e1d24`](https://github.com/nachollorca/lmeh/commit/d4e1d24f653b08556f326d0c8af6d20efc3a2d52))
+
+### Features
+
+- **optimizer**: Stop propser early if the score is already perfect
+  ([`c60741a`](https://github.com/nachollorca/lmeh/commit/c60741a43642702a405a45b4ad2564738477f38a))
+
+### Refactoring
+
+- **prompts**: Move prompts to jinja files instead of inlining them in the code
+  ([`2301ca3`](https://github.com/nachollorca/lmeh/commit/2301ca3f21e7659eaccb12bb2e72db9a7ba61a54))
+
+
 ## v1.7.1 (2026-06-12)
 
 ### Bug Fixes
