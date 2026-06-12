@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.7.1 (2026-06-12)
+
+### Bug Fixes
+
+- **optimizer**: Ensure that jinja variables in nested prompt templates are shown properly
+  ([`075dfa2`](https://github.com/nachollorca/lmeh/commit/075dfa26ab95599edc08f0aa80b715f3a597a65d))
+
+- **optimizer**: Split the rendering of the results legend to avoid duplication in each step render
+  ([`0a421ca`](https://github.com/nachollorca/lmeh/commit/0a421ca816556f878cc0e0d821d6982250af03a3))
+
+### Refactoring
+
+- **optimizer**: Move rendering code together instead of having reporting + optimizer
+  ([`aa12d0f`](https://github.com/nachollorca/lmeh/commit/aa12d0f2d976faebf4b32566447f30883fce4491))
+
+
 ## v1.7.0 (2026-06-10)
 
 ### Code Style
