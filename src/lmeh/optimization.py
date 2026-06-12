@@ -8,10 +8,12 @@ The search is OPRO-style and free-form. Each step the proposer rewrites the
 template from scratch given the full chronological trajectory, with the best
 checkpoint clearly marked. The objective is fixed to ``RunResults.overall.mean``
 and the budget is a fixed number of steps; the archive keeps the best
-checkpoint, so the search may regress without losing the winner.
+checkpoint, so the search may regress without losing the winner. Proposing
+stops early once a checkpoint scores perfectly (``overall.mean >= 1.0``).
 """
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Protocol
 
 from lmdk import complete, render_template
@@ -20,6 +22,10 @@ from pydantic import BaseModel, Field
 from lmeh.datatypes import Example, Experiment, LMConfig, Metric, OptimizationResult, Step
 from lmeh.execution import run_experiment
 from lmeh.rendering import render_history
+
+default_proposer_template = (
+    Path(__file__).parent / "prompt_templates" / "optimizer.jinja"
+).read_text()
 
 
 class Proposer(Protocol):
@@ -30,30 +36,6 @@ class Proposer(Protocol):
         steps: list[Step],
         config: LMConfig,
     ) -> str: ...
-
-
-default_proposer_template = """
-We have a function that calls a language model to accomplish a task.
-Its output quality is measured by one or more metrics over a fixed dataset.
-Each metric is normalized to [0, 1] and combined into a single headline score (higher is better).
-
-We are searching for a prompt template that maximizes that headline score.
-
-Below is the full optimization trajectory in chronological order. A legend at the top
-explains how to read the scores and sections.
-
-{{ HISTORY }}
-
-Study the trajectory: infer what changes helped, what hurt, and where the
-current best prompt still fails. Then write an improved prompt template. You may
-refine the best checkpoint or explore a different approach.
-
-Keep every Jinja placeholder (enclosed in double curly braces) from the templates
-above exactly as-is (same names and syntax). Removing or renaming them breaks
-rendering and makes the template unusable.
-
-Return the complete prompt template, ready to use as-is.
-""".strip()
 
 
 class _ProposedTemplate(BaseModel):
@@ -117,9 +99,10 @@ def optimize(
     The loop is: evaluate the experiment's current template as the baseline
     (step 0), then for each of ``steps`` iterations render the trajectory, ask
     ``proposer`` for a new template, evaluate it, and append it to the archive.
-    The objective is fixed to ``RunResults.overall.mean`` and there is no early
-    stopping; :attr:`OptimizationResult.best` selects the winner, which need not
-    be the last step.
+    The objective is fixed to ``RunResults.overall.mean``. Proposing stops once
+    a checkpoint reaches a perfect overall score (``>= 1.0``), even if
+    ``steps`` has not been exhausted; :attr:`OptimizationResult.best` selects
+    the winner, which need not be the last step.
 
     Args:
         experiment: Carries the target, the baseline ``prompt_template``, and
@@ -144,6 +127,8 @@ def optimize(
     archive = [Step(prompt_template=experiment.prompt_template, result=baseline)]
 
     for _ in range(steps):
+        if archive[-1].score >= 1.0:
+            break
         candidate = proposer(steps=archive, config=proposer_config)
         candidate_experiment = replace(experiment, prompt_template=candidate)
         result = run_experiment(

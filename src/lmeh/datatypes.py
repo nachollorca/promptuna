@@ -24,6 +24,7 @@ This module is organized in two halves:
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Protocol
 
 from lmdk import CompletionRequest, CompletionResponse
@@ -237,39 +238,6 @@ class ProgrammaticScorer(Protocol):
     ) -> RawScore: ...
 
 
-default_judge_template = """
-You will be acting as an expert judge to evaluate the result produced by an LLM-based function.
-Your task is to assess and score how well the result meets the specified evaluation metric.
-
-Here is the original prompt that was sent to the LLM:
-
-<rendered_prompt>
-{{RENDERED_PROMPT}}
-</rendered_prompt>
-
-Here is the result that was obtained from the LLM:
-
-<output>
-{{OUTPUT}}
-</output>
-
-{% if REFERENCE %}
-This is the golden-standard expected reference:
-
-<reference>
-{{REFERENCE}}
-</reference>
-{% endif %}
-
-And this is the specific metric you should use to evaluate the result:
-
-<metric>
-{{METRIC}}
-</metric>
-
-Now go ahead and score the result obtained by the LLM function for the given metric.""".strip()
-
-
 class LLMJudgeScorer(Protocol):
     """Signature of any LLM-judge scoring function.
 
@@ -304,6 +272,9 @@ class ProgrammaticMetric:
     description: str
     scale: Scale
     scorer: ProgrammaticScorer
+
+
+default_judge_template = (Path(__file__).parent / "prompt_templates" / "judge.jinja").read_text()
 
 
 @dataclass
