@@ -618,3 +618,44 @@ def _aggregate(values) -> Aggregate:
         return Aggregate(mean=m, sd=0.0, n=1)
     var = sum((v - m) ** 2 for v in vals) / (n - 1)
     return Aggregate(mean=m, sd=var**0.5, n=n)
+
+
+# ---------------------------------------------------------------------------
+# Optimization: the archive produced by a prompt-template search
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Step:
+    """One checkpoint in the search: a candidate template and how it scored.
+
+    Args:
+        prompt_template: The candidate template that was evaluated.
+        result: The full run produced by evaluating it on the examples.
+    """
+
+    prompt_template: str
+    result: RunResults
+
+    @property
+    def score(self) -> float:
+        """The headline objective for this step (``RunResults.overall.mean``)."""
+        return self.result.overall.mean
+
+
+@dataclass
+class OptimizationResult:
+    """The full archive produced by :func:`lmeh.optimization.optimize`.
+
+    Args:
+        steps: Every checkpoint in chronological order. ``steps[0]`` is the
+            baseline (the experiment's original template); each later entry is
+            a proposed candidate.
+    """
+
+    steps: list[Step]
+
+    @property
+    def best(self) -> Step:
+        """The highest-scoring step (ties resolve to the earliest)."""
+        return max(self.steps, key=lambda step: step.score)

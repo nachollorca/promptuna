@@ -11,53 +11,15 @@ and the budget is a fixed number of steps; the archive keeps the best
 checkpoint, so the search may regress without losing the winner.
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Protocol
 
 from lmdk import complete, render_template
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from lmeh.datatypes import Example, Experiment, LMConfig, Metric, RunResults
+from lmeh.datatypes import Example, Experiment, LMConfig, Metric, OptimizationResult, Step
 from lmeh.execution import run_experiment
-
-# How many of the weakest examples to surface per checkpoint in the history.
-_MAX_WEAK_EXAMPLES = 3
-
-
-@dataclass(frozen=True)
-class Step:
-    """One checkpoint in the search: a candidate template and how it scored.
-
-    Args:
-        prompt_template: The candidate template that was evaluated.
-        result: The full run produced by evaluating it on the examples.
-    """
-
-    prompt_template: str
-    result: RunResults
-
-    @property
-    def score(self) -> float:
-        """The headline objective for this step (``RunResults.overall.mean``)."""
-        return self.result.overall.mean
-
-
-@dataclass
-class OptimizationResult:
-    """The full archive produced by :func:`optimize`.
-
-    Args:
-        steps: Every checkpoint in chronological order. ``steps[0]`` is the
-            baseline (the experiment's original template); each later entry is
-            a proposed candidate.
-    """
-
-    steps: list[Step]
-
-    @property
-    def best(self) -> Step:
-        """The highest-scoring step (ties resolve to the earliest)."""
-        return max(self.steps, key=lambda step: step.score)
+from lmeh.rendering import render_history
 
 
 class Proposer(Protocol):
@@ -70,119 +32,6 @@ class Proposer(Protocol):
     ) -> str: ...
 
 
-def render_history(steps: list[Step]) -> str:
-    """Render the chronological trajectory into the proposer's context string.
-
-    Pure function over the archive. For each checkpoint it emits the headline
-    score, its delta versus the baseline, an explicit ``★`` marker on the
-    best-so-far step, the per-metric breakdown, the full prompt template, and a
-    sample of the weakest examples with the judge's reasoning — everything the
-    proposer needs to reason about what helped, what hurt, and where the
-    current best still fails.
-
-    Args:
-        steps: Chronological archive; ``steps[0]`` is the baseline.
-
-    Returns:
-        A human-readable, model-facing string. Empty input yields ``""``.
-    """
-    if not steps:
-        return ""
-
-    baseline_score = steps[0].score
-    best_index = max(range(len(steps)), key=lambda i: steps[i].score)
-
-    blocks: list[str] = []
-    for i, step in enumerate(steps):
-        blocks.append(_render_step(step, i, baseline_score, is_best=i == best_index))
-    return "\n\n".join(blocks)
-
-
-def _signed(delta: float) -> str:
-    """Format a score delta with an explicit sign, e.g. ``+0.0900`` / ``-0.0100``."""
-    return f"{delta:+.4f}"
-
-
-def _step_header(step: Step, index: int, baseline_score: float, is_best: bool) -> str:
-    """Build the checkpoint header line for :func:`_render_step`."""
-    label = "baseline" if index == 0 else f"candidate {index}"
-    marker = " ★ best so far" if is_best else ""
-    header = f"=== Step {index} ({label}){marker} | score {step.score:.4f}"
-    if index > 0:
-        header += f" ({_signed(step.score - baseline_score)} vs baseline)"
-    return header + " ==="
-
-
-def _per_metric_lines(result: RunResults) -> list[str]:
-    """Render per-metric score lines for a checkpoint."""
-    lines = ["Per-metric:"]
-    per_metric = result.per_metric()
-    if not per_metric:
-        lines.append("  (no scores)")
-        return lines
-    for name in sorted(per_metric):
-        lines.append(f"  - {name}: {per_metric[name].mean:.4f}")
-    return lines
-
-
-def _weak_examples_lines(result: RunResults) -> list[str]:
-    """Render weakest-example detail lines for a checkpoint."""
-    weak = _weakest_examples(result, _MAX_WEAK_EXAMPLES)
-    if not weak:
-        return []
-    lines = ["Weakest examples:"]
-    for example, mean_score, breakdown in weak:
-        lines.append(f"  - inputs={example.inputs!r} | mean {mean_score:.4f}")
-        for metric_name, normalized, reason in breakdown:
-            detail = f"      {metric_name}: {normalized:.4f}"
-            if reason:
-                detail += f" — {reason}"
-            lines.append(detail)
-    return lines
-
-
-def _render_step(step: Step, index: int, baseline_score: float, is_best: bool) -> str:
-    """Render a single checkpoint block for :func:`render_history`."""
-    lines = [
-        _step_header(step, index, baseline_score, is_best=is_best),
-        "",
-        *_per_metric_lines(step.result),
-        "",
-        "Prompt:",
-        step.prompt_template,
-    ]
-    weak_lines = _weak_examples_lines(step.result)
-    if weak_lines:
-        lines += ["", *weak_lines]
-    return "\n".join(lines)
-
-
-MetricBreakdown = tuple[str, float, str]
-WeakExampleEntry = tuple[Example, float, list[MetricBreakdown]]
-
-
-def _weakest_examples(result: RunResults, limit: int) -> list[WeakExampleEntry]:
-    """Return the ``limit`` lowest-scoring examples with their per-metric detail.
-
-    Each entry is ``(example, mean_normalized, [(metric, normalized, reason)])``,
-    sorted worst-first. Examples are pooled across metrics and replicates by
-    ``id(example)``, mirroring ``RunResults.per_example``.
-    """
-    grouped: dict[int, tuple[Example, list[MetricBreakdown]]] = {}
-    for scoring in result.successful_scorings:
-        example = scoring.trial.example
-        _, breakdown = grouped.setdefault(id(example), (example, []))
-        breakdown.append((scoring.metric.name, scoring.score.normalized, scoring.score.reason))
-
-    ranked: list[WeakExampleEntry] = []
-    for example, breakdown in grouped.values():
-        mean_score = sum(n for _, n, _ in breakdown) / len(breakdown)
-        ranked.append((example, mean_score, breakdown))
-
-    ranked.sort(key=lambda entry: entry[1])
-    return ranked[:limit]
-
-
 default_proposer_template = """
 We have a function that calls a language model to accomplish a task.
 Its output quality is measured by one or more metrics over a fixed dataset.
@@ -190,19 +39,18 @@ Each metric is normalized to [0, 1] and combined into a single headline score (h
 
 We are searching for a prompt template that maximizes that headline score.
 
-Below is the full optimization trajectory in chronological order. Step 0 is the
-original prompt and its baseline results; every later step is a candidate that
-was proposed and evaluated. The best step so far is marked with ★. For each step
-you can see its headline score, the per-metric breakdown, the exact prompt that
-produced it, and a sample of its weakest examples with the judge's reasoning.
+Below is the full optimization trajectory in chronological order. A legend at the top
+explains how to read the scores and sections.
 
-<history>
 {{ HISTORY }}
-</history>
 
 Study the trajectory: infer what changes helped, what hurt, and where the
 current best prompt still fails. Then write an improved prompt template. You may
 refine the best checkpoint or explore a different approach.
+
+Keep every Jinja placeholder (enclosed in double curly braces) from the templates
+above exactly as-is (same names and syntax). Removing or renaming them breaks
+rendering and makes the template unusable.
 
 Return the complete prompt template, ready to use as-is.
 """.strip()
@@ -211,6 +59,9 @@ Return the complete prompt template, ready to use as-is.
 class _ProposedTemplate(BaseModel):
     """Structured-output schema for :func:`default_proposer`."""
 
+    thinking: str = Field(
+        description="What seems to work? What is the error analysis? What could be improved?"
+    )
     prompt_template: str
 
 
@@ -231,7 +82,11 @@ def default_proposer(
     Returns:
         The proposed prompt template.
     """
-    prompt = render_template(template=template, HISTORY=render_history(steps))
+    prompt = render_template(
+        template=template,
+        HISTORY=render_history(steps),
+        strip_curly_brackets=False,
+    )
     response = complete(
         model=config.model,
         prompt=prompt,
