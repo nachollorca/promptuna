@@ -1,10 +1,20 @@
 # Language Model Evaluation Harness
 
-`lmeh` evaluates *functions that use an LM* to accomplish a goal, not bare completion calls.
+`lmeh` evaluates and optimizes *functions that use an LM* to accomplish a goal.
 
-Such function can optionally surrounded by arbitrary deterministic code that prepares the prompt (pre-processing) and refines the model's output (post-processing).
+> Such functions or programs do not refer only to the bare completion call, but they can be surrounded by arbitrary deterministic code that prepares the prompt (pre-processing) and refines the model's output (post-processing).
 
-See the [getting started notebook](cookbook/getting_started.ipynb) for a full walkthrough.
+In the refinement loop below, `lmeh` provides the primitives for you to define the metrics that judge how well your program performs (3). Then, it can use those scores to drive automated improvements on the prompt template (4).
+
+```mermaid
+flowchart LR
+    A[1. Make a program] --> B[2. Run the program]
+    B --> C[3. Evaluate the program]
+    C --> D[4. Improve the program]
+    D --> B
+```
+
+See the [getting started notebook](cookbook/getting_started.ipynb) for a full working example of this cycle end to end.
 
 ## Optimization
 

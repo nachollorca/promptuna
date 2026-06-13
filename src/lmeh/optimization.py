@@ -38,10 +38,10 @@ class Proposer(Protocol):
     ) -> str: ...
 
 
-class Output(BaseModel):
-    """Structured-output schema for :func:`default_proposer`.
+class Thinking(BaseModel):
+    """Structured reasoning forced upon the optimizer before proposing a new template.
 
-    Follows the approach explained in Attentive Reasoning Query sequence: https://arxiv.org/pdf/2503.03669
+    Follows the approach explained in Attentive Reasoning Query paper: https://arxiv.org/pdf/2503.03669
     """
 
     reinstate_goal: str = Field(
@@ -84,7 +84,17 @@ class Output(BaseModel):
             "Exploit or explore? Say whether you refine the best step or explore a new approach."
         )
     )
-    prompt_template: str
+
+
+class Output(BaseModel):
+    """Structured-output schema for :func:`default_proposer`."""
+
+    thinking: Thinking = Field(
+        description="Comprehensive analysis of the trajectory to propose a new template candidate."
+    )
+    prompt_template: str = Field(
+        description="The new prompt template candidate grounded on the analysis of the trajectory."
+    )
 
 
 def default_proposer(
