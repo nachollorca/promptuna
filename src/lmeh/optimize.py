@@ -1,6 +1,6 @@
 """Prompt-template optimization.
 
-Closes the loop around :func:`lmeh.execution.run_experiment`: given a fixed
+Closes the loop around :func:`lmeh.evaluate.run_experiment`: given a fixed
 model and a set of metrics, search for a prompt template that scores better
 on a flat ``list[Example]``.
 
@@ -12,29 +12,63 @@ checkpoint, so the search may regress without losing the winner. Proposing
 stops early once a checkpoint scores perfectly (``overall.mean >= 1.0``).
 """
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
 
-from lmeh.datatypes import Example, Experiment, LMConfig, Metric, OptimizationResult, Step
-from lmeh.execution import run_experiment
-from lmeh.rendering import render_history
+from lmeh.evaluate import Metric, RunResults, run_experiment
+from lmeh.program import Example, Experiment, LMConfig
+from lmeh.report import _render_legend, render_run
 
 default_proposer_template = (
     Path(__file__).parent / "prompt_templates" / "optimizer.jinja"
 ).read_text()
 
 
+@dataclass(frozen=True)
+class Step:
+    """One checkpoint in the search: a candidate template and how it scored.
+
+    Args:
+        prompt_template: The candidate template that was evaluated.
+        result: The full run produced by evaluating it on the examples.
+    """
+
+    prompt_template: str
+    result: RunResults
+
+    @property
+    def score(self) -> float:
+        """The headline objective for this step (``RunResults.overall.mean``)."""
+        return self.result.overall.mean
+
+
+@dataclass
+class OptimizationResult:
+    """The full archive produced by :func:`optimize`.
+
+    Args:
+        steps: Every checkpoint in chronological order. ``steps[0]`` is the
+            baseline (the experiment's original template); each later entry is
+            a proposed candidate.
+    """
+
+    steps: list[Step]
+
+    @property
+    def best(self) -> Step:
+        """The highest-scoring step (ties resolve to the earliest)."""
+        return max(self.steps, key=lambda step: step.score)
+
+
 class Proposer(Protocol):
     """Generates the next candidate template from the trajectory so far."""
 
     def __call__(  # noqa: D102
-        self,
-        steps: list[Step],
-        config: LMConfig,
+        self, steps: list[Step], config: LMConfig
     ) -> str: ...
 
 
@@ -103,7 +137,7 @@ def default_proposer(
     """Render the trajectory and ask the model for a better template.
 
     Renders ``template`` with the ``HISTORY`` produced by
-    :func:`render_history` and calls the model with structured output, so the
+    :func:`~lmeh.report.render_history` and calls the model with structured output, so the
     returned value is a clean template string rather than free-form prose.
 
     Args:
@@ -141,7 +175,7 @@ def optimize(
 ) -> OptimizationResult:
     """Search for a prompt template that scores better on ``examples``.
 
-    Mirrors :func:`lmeh.execution.run_experiment`: same positional contract
+    Mirrors :func:`lmeh.evaluate.run_experiment`: same positional contract
     (``experiment``, ``examples``, ``metrics``), operating on a flat
     ``list[Example]`` with no train/test split — holdout evaluation is the
     caller's responsibility.
@@ -150,13 +184,13 @@ def optimize(
     (step 0), then for each of ``steps`` iterations render the trajectory, ask
     ``proposer`` for a new template, evaluate it, and append it to the archive.
     The objective is fixed to ``RunResults.overall.mean``. Proposing stops once
-    a checkpoint reaches a perfect overall score (``>= 1.0``), even if
-    ``steps`` has not been exhausted; :attr:`OptimizationResult.best` selects
-    the winner, which need not be the last step.
+    a checkpoint reaches a perfect overall score (``>= 1.0``), or the budgeted
+    ``steps`` are exhausted. :attr:`OptimizationResult.best` selects the winner,
+    which does not need to be the last step.
 
     Args:
-        experiment: Carries the target, the baseline ``prompt_template``, and
-            the (fixed) target model config. Not mutated — each candidate is
+        experiment: Carries the program, the baseline ``prompt_template``, and
+            the (fixed) program model config. Not mutated — each candidate is
             evaluated on a copy.
         examples: Dataset to optimize against.
         metrics: Metrics to score each run; combined via.
@@ -187,3 +221,59 @@ def optimize(
         archive.append(Step(prompt_template=candidate, result=result))
 
     return OptimizationResult(steps=archive)
+
+
+def _signed(delta: float) -> str:
+    """Format a score delta with an explicit sign, e.g. ``+0.09`` / ``-0.01``."""
+    return f"{delta:+.2f}"
+
+
+def _render_step_heading(step: Step, index: int, baseline_score: float, is_best: bool) -> str:
+    """Build the per-step ``##`` heading for :func:`render_history`."""
+    role = "baseline" if index == 0 else "candidate"
+    parts = [f"## Step {index} — {role} · score {step.score:.2f}"]
+    if index > 0:
+        parts.append(f"Δ {_signed(step.score - baseline_score)} vs baseline")
+    if is_best:
+        parts.append("⭐ best")
+    return " · ".join(parts)
+
+
+def render_history(steps: list[Step]) -> str:
+    """Render the chronological trajectory into the proposer's context string.
+
+    Pure function over the archive. Opens with a one-time legend, then each
+    checkpoint is a ``## Step N`` heading with role/score/delta metadata, a
+    ``<template>`` block with the exact template, and the shared
+    :func:`~lmeh.report.render_run` body (without telemetry or per-step legends).
+
+    Args:
+        steps: Chronological archive; ``steps[0]`` is the baseline.
+
+    Returns:
+        A human-readable, model-facing string. Empty input yields ``""``.
+    """
+    if not steps:
+        return ""
+
+    baseline_score = steps[0].score
+    best_index = max(range(len(steps)), key=lambda i: steps[i].score)
+
+    preamble = "\n\n".join(
+        [
+            "## How to read these results",
+            "",
+            _render_legend(trajectory=True),
+        ]
+    )
+
+    step_blocks: list[str] = []
+    for i, step in enumerate(steps):
+        sections = [
+            _render_step_heading(step, i, baseline_score, is_best=i == best_index),
+            f"<template>\n{step.prompt_template}\n</template>",
+            render_run(step.result, telemetry=False, legend=False),
+        ]
+        step_blocks.append("\n\n".join(sections))
+
+    return preamble + "\n\n" + "\n\n---\n\n".join(step_blocks)

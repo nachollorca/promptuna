@@ -1,127 +1,31 @@
-"""Core data contracts shared across the harness.
+"""Score trials and run full experiments.
 
-Conceptual flow:
+Two entry points:
 
-    list[Example] -> Example
-    Experiment = TargetFunction + prompt_template + LMConfig
-    Trial = result of running one Experiment on one Example
-    Metric = what we want to measure
-    Scoring = one Metric applied to one Trial
-    RunResults = all Trials and Scorings from one Experiment run
+- :func:`run_experiment` blocks and returns a fully-populated :class:`RunResults`.
+- :func:`stream_experiment` yields :class:`Trial` and :class:`Scoring` items
+  as soon as they are ready, so callers can render progress or persist
+  partial results and survive mid-run crashes.
 
-The harness keeps generation and scoring separate:
-- Trials store target execution results.
-- Scorings store metric results.
-
-This module is organized in two halves:
-
-1. Types the *user* defines or constructs when wiring up an evaluation
-   (examples, targets, metrics, scales).
-2. Types the *harness* produces and the user only reads (trials, scorings,
-   run results).
+Both share the same threaded engine. :func:`~lmeh.run.run_trial` and
+:func:`score_metric` are total functions: they never raise, instead wrapping
+failures into :class:`~lmeh.run.FailedTrial` / :class:`FailedScoring` so the
+executor loop stays simple.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
-from lmdk import CompletionRequest, CompletionResponse
+from lmdk import CompletionResponse, complete, render_template
+from pydantic import BaseModel, ConfigDict, create_model
 
-# ---------------------------------------------------------------------------
-# Inputs: things the user defines
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class Example:
-    """A single dataset row.
-
-    Some metrics (e.g. "is length less than X") do not need a ground truth,
-    hence ``reference`` is optional.
-
-    Args:
-        inputs: Arbitrary inputs the target needs — domain objects, raw text,
-            whatever the production caller would pass. Unpacked as keyword
-            arguments into the ``TargetFunction``; the keys must match the
-            target's parameter names.
-        reference: Expected output, if available.
-    """
-
-    inputs: dict[str, Any]
-    reference: Any | None = None
-
-
-@dataclass
-class LMConfig:  # I am not sure if this is the best name. Maybe we can run with LM alone or Model
-    """How to invoke a language model.
-
-    Uniform across target, judge, and (future) optimizer call sites — none
-    of them need anything more than this to dispatch a completion.
-
-    Args:
-        model: Identifier of the model to call.
-        generation_kwargs: Extra arguments forwarded to the model call.
-
-    Note:
-        Structured-output schemas are intentionally *not* part of this
-        config. The expected response shape is the caller's responsibility:
-        a target function defines the schema it needs internally, and LLM
-        judges build their own schema from the metric's scale. ``LMConfig``
-        only carries what is genuinely shared across call sites.
-    """
-
-    model: str
-    generation_kwargs: dict[str, Any] | None = None
-
-
-class TargetFunction(Protocol):
-    """The shape every function under evaluation must follow.
-
-    A target is a function that achieves a goal using **exactly one** LM
-    completion. It may run arbitrary deterministic code before the call to
-    prepare the prompt (e.g. format inputs, render the template) and after
-    the call to refine the model's response (e.g. parse, validate, repair).
-    Chains of multiple LM calls are out of scope.
-
-    The target may return whatever Python value is most natural for the
-    downstream scorers — a bool, a string, a pydantic model, a tuple. The
-    harness captures the underlying ``CompletionRequest`` /
-    ``CompletionResponse`` automatically via ``lmdk.observe``, so the target
-    does not need to surface them explicitly.
-    """
-
-    def __call__(  # noqa: D102
-        self,
-        prompt_template: str,
-        config: LMConfig,
-        **inputs: Any,
-    ) -> Any: ...
-
-
-@dataclass
-class Experiment:
-    """A named target plus the prompt and LM config under test.
-
-    Args:
-        name: Human-readable identifier for the experiment.
-        target: The function under evaluation.
-        prompt_template: Jinja-style template the target renders before
-            calling the model.
-        config: How to invoke the target model.
-        repeats: How many times to run the target per example. LLMs are
-            stochastic, so >1 yields a distribution of outputs per example
-            instead of a point estimate. Each repeat becomes its own
-            ``Trial`` tagged with ``replicate``.
-    """
-
-    name: str
-    target: TargetFunction
-    prompt_template: str
-    config: LMConfig
-    repeats: int = 1
-
+from lmeh.program import Example, Experiment, LMConfig
+from lmeh.run import FailedTrial, SuccessfulTrial, Trial, run_trial
 
 # ---------------------------------------------------------------------------
 # Scoring: scales, scores, scorers, metrics
@@ -241,7 +145,7 @@ class ProgrammaticScorer(Protocol):
 class LLMJudgeScorer(Protocol):
     """Signature of any LLM-judge scoring function.
 
-    Receives the rendered target prompt so the judge can reason about both
+    Receives the rendered program prompt so the judge can reason about both
     the question and the model's answer. The judge's own prompt template
     lives on ``LLMJudgeMetric.prompt_template``; the judge's model and gen kwargs
     live on ``config``.
@@ -292,7 +196,7 @@ class LLMJudgeMetric:
         prompt_template: Jinja-style template the judge renders before
             calling the model. Defaults to ``default_judge_template``.
         repeats: how many times to run the judge per trial. Captures judge
-            stochasticity independently from target stochasticity. Each repeat
+            stochasticity independently from program stochasticity. Each repeat
             becomes its own ``Scoring`` tagged with ``replicate``.
     """
 
@@ -314,56 +218,8 @@ Dispatch with ``isinstance`` — the two variants carry different state
 
 
 # ---------------------------------------------------------------------------
-# Outputs: things the harness produces (users read, rarely construct)
+# Scoring results
 # ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class SuccessfulTrial:
-    """A trial whose target executed without raising.
-
-    ``output`` is whatever the target returned (free-form). ``request`` and
-    ``response`` are captured automatically by the harness via
-    ``lmdk.observe`` around the target call: they hold the final rendered
-    prompt + kwargs and the raw LM response (latency, tokens, finish reason,
-    etc.). They are ``None`` only if the target performed no completion.
-
-    ``replicate`` is the 0-indexed repeat number; with
-    ``Experiment.repeats=1`` (default) it is always ``0``.
-    """
-
-    example: Example
-    output: Any
-    request: CompletionRequest | None = None
-    response: CompletionResponse | None = None
-    replicate: int = 0
-
-    @property
-    def rendered_prompt(self) -> str:
-        """The exact user prompt sent by the target.
-
-        The harness assumes targets send exactly one user message.
-        """
-        assert self.request is not None, "Successful trial must carry a request"
-        return self.request.prompt[0].content
-
-
-@dataclass(frozen=True)
-class FailedTrial:
-    """A trial whose target raised. ``error`` is surfaced in aggregates."""
-
-    example: Example
-    error: Exception
-    replicate: int = 0
-
-
-Trial = SuccessfulTrial | FailedTrial
-"""One execution of an Experiment against one Example.
-
-A tagged union: pattern-match on ``SuccessfulTrial`` / ``FailedTrial`` (or
-use ``isinstance``) to consume. The target is what's under evaluation, so
-failed trials remain in ``RunResults.trials`` and count against the run.
-"""
 
 
 @dataclass(frozen=True)
@@ -427,11 +283,11 @@ class RunResults:
 
     Results are stored along two parallel axes:
 
-    - ``trials``: one entry per ``(example, target-replicate)``. Telemetry
+    - ``trials``: one entry per ``(example, program-replicate)``. Telemetry
       iterates this list so an example evaluated by N metrics is not
       overcounted.
     - ``scorings``: one entry per ``(trial, metric, judge-replicate)``.
-      Failed trials contribute sentinel zero scores (the target is what's
+      Failed trials contribute sentinel zero scores (the program is what's
       under evaluation); scorer errors contribute ``FailedScoring`` entries
       and are excluded from quality aggregates.
 
@@ -468,7 +324,7 @@ class RunResults:
 
     @property
     def failure_rate(self) -> float:
-        """What fraction of target invocations crashed?"""
+        """What fraction of program invocations crashed?"""
         return 1.0 - len(self.successful_trials) / len(self.trials) if self.trials else 0.0
 
     @property
@@ -525,7 +381,7 @@ class RunResults:
         """What's the score for each (example, metric) cell, aggregated across replicates only?
 
         The atomic unit of dispersion: ``sd`` here is pure measurement
-        noise (target sampling x judge sampling) for one cell, with no
+        noise (program sampling x judge sampling) for one cell, with no
         dataset or metric mixing. Keyed by ``(id(example), metric.name)``.
         """
         cells: dict[tuple[int, str], list[float]] = {}
@@ -555,7 +411,7 @@ class RunResults:
 
     @property
     def latency(self) -> float:
-        """How much compute time did target calls consume in total, in seconds?
+        """How much compute time did program calls consume in total, in seconds?
 
         Sum of per-trial latencies — equivalent to serial wall-clock,
         independent of how many workers actually ran the experiment.
@@ -569,7 +425,7 @@ class RunResults:
 
     @property
     def speed(self) -> float:
-        """What's the average target throughput in output tokens per second?"""
+        """What's the average program throughput in output tokens per second?"""
         lat = self.latency
         return self.output_tokens / lat if lat > 0 else 0.0
 
@@ -592,41 +448,270 @@ def _aggregate(values) -> Aggregate:
 
 
 # ---------------------------------------------------------------------------
-# Optimization: the archive produced by a prompt-template search
+# Built-in LLM judge
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class Step:
-    """One checkpoint in the search: a candidate template and how it scored.
+def _schema_for_scale(scale: Scale) -> type[BaseModel]:
+    """Build a ``{raw, reason}`` pydantic schema typed against ``scale``.
 
-    Args:
-        prompt_template: The candidate template that was evaluated.
-        result: The full run produced by evaluating it on the examples.
+    - ``Range`` → ``raw: float``.
+    - ``Ordinal`` → ``raw: Literal[<levels>]`` so the model is forced to
+      pick one of the allowed values.
+    - Anything else → ``raw: Any`` (best effort; harness scale validation
+      still runs on the returned value).
     """
+    if isinstance(scale, Range):
+        raw_ann: Any = float
+    elif isinstance(scale, Ordinal):
+        raw_ann = Literal[tuple(scale.levels)]  # ty: ignore[invalid-type-form]
+    else:
+        raw_ann = Any
+    return create_model(
+        "JudgeOutput",
+        __config__=ConfigDict(extra="forbid"),
+        raw=(raw_ann, ...),
+        reason=(str, ...),
+    )
 
-    prompt_template: str
-    result: RunResults
 
-    @property
-    def score(self) -> float:
-        """The headline objective for this step (``RunResults.overall.mean``)."""
-        return self.result.overall.mean
+def default_llm_judge(
+    output: Any,
+    example: Example,
+    metric: LLMJudgeMetric,
+    config: LMConfig,
+    rendered_prompt: str,
+) -> RawScore:
+    """Render the judge template, call the model, return a ``RawScore``.
 
+    The default template (``default_judge_template``) expects these variables:
 
-@dataclass
-class OptimizationResult:
-    """The full archive produced by :func:`lmeh.optimization.optimize`.
+    - ``RENDERED_PROMPT``: the exact prompt the program sent to the model.
+    - ``OUTPUT``: the program's post-processed output (stringified).
+    - ``REFERENCE``: ``example.reference`` (may be ``None``; the default
+      template wraps this block in an ``{% if REFERENCE %}``).
+    - ``METRIC``: ``metric.description`` — what the judge is evaluating for.
 
-    Args:
-        steps: Every checkpoint in chronological order. ``steps[0]`` is the
-            baseline (the experiment's original template); each later entry is
-            a proposed candidate.
+    The output schema is derived from ``metric.scale``. Any error (template
+    rendering, model call, schema validation) propagates so the harness
+    records a ``FailedScoring`` rather than silently producing a bad score.
     """
+    schema = _schema_for_scale(metric.scale)
+    prompt = render_template(
+        template=metric.prompt_template,
+        RENDERED_PROMPT=rendered_prompt,
+        OUTPUT=str(output),
+        REFERENCE=example.reference,
+        METRIC=metric.description,
+    )
+    response = complete(
+        model=config.model,
+        prompt=prompt,
+        output_schema=schema,
+        generation_kwargs=config.generation_kwargs,
+    )
+    parsed = response.parsed
+    assert parsed is not None, "judge model returned no structured output"
+    return RawScore(raw=parsed.raw, reason=parsed.reason)
 
-    steps: list[Step]
 
-    @property
-    def best(self) -> Step:
-        """The highest-scoring step (ties resolve to the earliest)."""
-        return max(self.steps, key=lambda step: step.score)
+# ---------------------------------------------------------------------------
+# Experiment orchestration
+# ---------------------------------------------------------------------------
+
+
+def run_experiment(
+    experiment: Experiment,
+    examples: list[Example],
+    metrics: list[Metric],
+    workers: int = 1,
+) -> RunResults:
+    """Run ``experiment`` over ``examples`` and score every ``metric``.
+
+    Blocks until the whole run is done. For incremental consumption use
+    :func:`stream_experiment`.
+    """
+    trials: list[Trial] = []
+    scorings: list[Scoring] = []
+    for item in stream_experiment(experiment, examples, metrics, workers=workers):
+        if isinstance(item, (SuccessfulTrial, FailedTrial)):
+            trials.append(item)
+        else:
+            scorings.append(item)
+    return RunResults(
+        experiment=experiment,
+        run=RunInfo(),
+        trials=trials,
+        scorings=scorings,
+    )
+
+
+def stream_experiment(
+    experiment: Experiment,
+    examples: list[Example],
+    metrics: list[Metric],
+    workers: int = 1,
+) -> Iterator[Trial | Scoring]:
+    """Run the experiment, yielding trials and scorings as they land.
+
+    Order is not deterministic: items arrive in completion order. A trial is
+    always yielded before any of its scorings.
+
+    The same thread pool is shared between program calls and LLM-judge
+    scorers so workers stay saturated: scoring for an example starts as soon
+    as its trial completes, without waiting for the rest of the examples.
+    Programmatic scorers run inline on the consumer thread (they are
+    cheap and not I/O-bound).
+    """
+    _validate_run(experiment=experiment, examples=examples, metrics=metrics)
+
+    if not examples:
+        return
+
+    with ThreadPoolExecutor(max_workers=max(workers, 1)) as pool:
+        trial_futures = _submit_trials(pool, experiment, examples)
+        score_futures: list[Future[Scoring]] = []
+
+        for fut in as_completed(trial_futures):
+            trial = fut.result()  # run_trial never raises
+            yield trial
+            yield from _dispatch_scorings(pool, trial, metrics, score_futures)
+
+        for fut in as_completed(score_futures):
+            yield fut.result()  # score_metric never raises
+
+
+def _submit_trials(
+    pool: ThreadPoolExecutor,
+    experiment: Experiment,
+    examples: list[Example],
+) -> dict[Future[Trial], Example]:
+    """Submit one trial future per ``(example, replicate)`` pair."""
+    return {
+        pool.submit(
+            run_trial,
+            experiment.program,
+            experiment.prompt_template,
+            experiment.config,
+            ex,
+            replicate=r,
+        ): ex
+        for ex in examples
+        for r in range(experiment.repeats)
+    }
+
+
+def _dispatch_scorings(
+    pool: ThreadPoolExecutor,
+    trial: Trial,
+    metrics: list[Metric],
+    score_futures: list[Future[Scoring]],
+) -> Iterator[Scoring]:
+    """Score ``trial`` against every metric.
+
+    Programmatic metrics run inline and are yielded immediately (deterministic
+    and cheap, so repeats are ignored). LLM-judge metrics are stochastic and
+    I/O-bound: each replicate is offloaded to ``pool`` and appended to
+    ``score_futures`` for the caller to drain later.
+    """
+    for metric in metrics:
+        if isinstance(metric, ProgrammaticMetric):
+            yield score_metric(trial, metric)
+        else:
+            for r in range(metric.repeats):
+                score_futures.append(pool.submit(score_metric, trial, metric, replicate=r))
+
+
+def score_metric(trial: Trial, metric: Metric, replicate: int = 0) -> Scoring:
+    """Apply ``metric`` to ``trial``.
+
+    Total function: any exception (scorer crash, malformed judge output,
+    out-of-scale value) is captured into a :class:`FailedScoring`.
+
+    Failed trials short-circuit to a sentinel zero score so they still
+    contribute to quality aggregates — the program is what is under
+    evaluation.
+    """
+    if isinstance(trial, FailedTrial):
+        return SuccessfulScoring(
+            trial=trial,
+            metric=metric,
+            score=Score(raw=0, normalized=0.0, reason=f"trial failed: {trial.error!r}"),
+            replicate=replicate,
+        )
+
+    try:
+        if isinstance(metric, ProgrammaticMetric):
+            raw_score = metric.scorer(trial.output, trial.example)
+        else:  # LLMJudgeMetric
+            raw_score = metric.scorer(
+                trial.output,
+                trial.example,
+                metric,
+                metric.config,
+                trial.rendered_prompt,
+            )
+        metric.scale.validate(raw_score.raw)
+        score = Score(
+            raw=raw_score.raw,
+            normalized=metric.scale.normalize(raw_score.raw),
+            reason=raw_score.reason,
+        )
+        return SuccessfulScoring(trial=trial, metric=metric, score=score, replicate=replicate)
+    except Exception as err:
+        return FailedScoring(trial=trial, metric=metric, error=err, replicate=replicate)
+
+
+def _validate_run(
+    experiment: Experiment,
+    examples: list[Example],
+    metrics: list[Metric],
+) -> None:
+    """Preflight checks. Raise ``ValueError`` on the first problem found.
+
+    Catches configuration mistakes cheaply, before any LM call is made.
+    Does not perform any network I/O.
+    """
+    _validate_examples(examples)
+    _validate_metrics(metrics)
+    _validate_experiment(experiment)
+
+
+def _validate_examples(examples: list[Example]) -> None:
+    if not examples:
+        raise ValueError("examples is empty")
+
+    has_ref = [ex.reference is not None for ex in examples]
+    if any(has_ref) and not all(has_ref):
+        raise ValueError(
+            "examples mix rows with and without `reference`; "
+            "make this all-or-nothing so reference-dependent metrics are unambiguous"
+        )
+
+
+def _validate_metrics(metrics: list[Metric]) -> None:
+    if not metrics:
+        raise ValueError("no metrics provided")
+
+    names = [m.name for m in metrics]
+    if len(set(names)) != len(names):
+        raise ValueError(f"metric names must be unique, got {names!r}")
+
+    for m in metrics:
+        if isinstance(m, LLMJudgeMetric):
+            if not m.config.model:
+                raise ValueError(f"metric {m.name!r}: config.model is empty")
+            if not m.prompt_template:
+                raise ValueError(f"metric {m.name!r}: prompt_template is empty")
+            if m.repeats < 1:
+                raise ValueError(f"metric {m.name!r}: repeats must be >= 1, got {m.repeats}")
+
+
+def _validate_experiment(experiment: Experiment) -> None:
+    if not experiment.prompt_template:
+        raise ValueError("experiment.prompt_template is empty")
+    cfg = experiment.config
+    if not cfg.model:
+        raise ValueError("experiment.config.model is empty")
+    if experiment.repeats < 1:
+        raise ValueError(f"experiment.repeats must be >= 1, got {experiment.repeats}")
