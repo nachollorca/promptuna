@@ -1,6 +1,6 @@
-"""Render :class:`~lmeh.datatypes.RunResults` and optimization trajectories as markdown."""
+"""Render :class:`~lmeh.evaluate.RunResults` and optimization trajectories as markdown."""
 
-from lmeh.datatypes import Aggregate, Example, RunResults, Step
+from lmeh.evaluate import Aggregate, Example, RunResults
 
 _MAX_WEAK_EXAMPLES = 3
 
@@ -50,7 +50,7 @@ def _render_legend(*, trajectory: bool = False) -> str:
         "means (dispersion = dataset heterogeneity); `Replicate noise` is the average "
         "within-cell SD across replicates (dispersion = measurement instability).",
         "",
-        "Trial failures count against the run (the target is under evaluation); "
+        "Trial failures count against the run (the program is under evaluation); "
         "scorer failures are excluded from quality aggregates.",
     ]
     if trajectory:
@@ -168,59 +168,3 @@ def render_run(results: RunResults, *, telemetry: bool = True, legend: bool = Tr
     if telemetry:
         sections.append(_render_telemetry(results))
     return "\n\n".join(sections)
-
-
-def _signed(delta: float) -> str:
-    """Format a score delta with an explicit sign, e.g. ``+0.09`` / ``-0.01``."""
-    return f"{delta:+.2f}"
-
-
-def _render_step_heading(step: Step, index: int, baseline_score: float, is_best: bool) -> str:
-    """Build the per-step ``##`` heading for :func:`render_history`."""
-    role = "baseline" if index == 0 else "candidate"
-    parts = [f"## Step {index} — {role} · score {step.score:.2f}"]
-    if index > 0:
-        parts.append(f"Δ {_signed(step.score - baseline_score)} vs baseline")
-    if is_best:
-        parts.append("⭐ best")
-    return " · ".join(parts)
-
-
-def render_history(steps: list[Step]) -> str:
-    """Render the chronological trajectory into the proposer's context string.
-
-    Pure function over the archive. Opens with a one-time legend, then each
-    checkpoint is a ``## Step N`` heading with role/score/delta metadata, a
-    ``<template>`` block with the exact template, and the shared
-    :func:`render_run` body (without telemetry or per-step legends).
-
-    Args:
-        steps: Chronological archive; ``steps[0]`` is the baseline.
-
-    Returns:
-        A human-readable, model-facing string. Empty input yields ``""``.
-    """
-    if not steps:
-        return ""
-
-    baseline_score = steps[0].score
-    best_index = max(range(len(steps)), key=lambda i: steps[i].score)
-
-    preamble = "\n\n".join(
-        [
-            "## How to read these results",
-            "",
-            _render_legend(trajectory=True),
-        ]
-    )
-
-    step_blocks: list[str] = []
-    for i, step in enumerate(steps):
-        sections = [
-            _render_step_heading(step, i, baseline_score, is_best=i == best_index),
-            f"<template>\n{step.prompt_template}\n</template>",
-            render_run(step.result, telemetry=False, legend=False),
-        ]
-        step_blocks.append("\n\n".join(sections))
-
-    return preamble + "\n\n" + "\n\n---\n\n".join(step_blocks)
