@@ -16,14 +16,8 @@ from promptuna.program import Example, LMConfig, Program
 class SuccessfulTrial:
     """A trial whose program executed without raising.
 
-    ``output`` is whatever the program returned (free-form). ``request`` and
-    ``response`` are captured automatically by the harness via
-    ``lmdk.observe`` around the program call: they hold the final rendered
-    prompt + kwargs and the raw LM response (latency, tokens, finish reason,
-    etc.). They are ``None`` only if the program performed no completion.
-
-    ``replicate`` is the 0-indexed repeat number; with
-    ``Experiment.repeats=1`` (default) it is always ``0``.
+    ``request`` and ``response`` are captured via ``lmdk.observe`` around the
+    program call.
     """
 
     example: Example
@@ -52,12 +46,7 @@ class FailedTrial:
 
 
 Trial = SuccessfulTrial | FailedTrial
-"""One execution of an Experiment against one Example.
-
-A tagged union: pattern-match on ``SuccessfulTrial`` / ``FailedTrial`` (or
-use ``isinstance``) to consume. The program is what's under evaluation, so
-failed trials remain in ``RunResults.trials`` and count against the run.
-"""
+"""One program run against one example (tagged union)."""
 
 
 def run_trial(
@@ -69,12 +58,7 @@ def run_trial(
 ) -> Trial:
     """Execute ``program`` against one ``example``.
 
-    ``example.inputs`` is unpacked as keyword arguments, so the program's
-    parameter names must match the dict keys.
-
-    Total function: any exception raised by the program is captured into a
-    :class:`FailedTrial`. The program is what is under evaluation, so its
-    failures are data, not bugs in the harness.
+    ``example.inputs`` is unpacked as keyword arguments.
     """
     try:
         with observe() as obs:

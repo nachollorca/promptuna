@@ -68,15 +68,10 @@ class Range(Scale):
 
 
 class Ordinal(Scale):
-    """Discrete (categorical or numerical) values ordered worst to best.
-
-    Adjacent values are assumed equidistant when normalizing.
+    """Discrete values ordered worst to best; adjacent levels are equidistant when normalizing.
 
     Examples:
         ``["terrible", "OK", "fantastic"]`` or ``[1, 2, 3, 4, 5]``.
-
-    Args:
-        levels: Allowed values, sorted from worst to best.
     """
 
     def __init__(self, levels: list[str | int | float]):
@@ -96,18 +91,7 @@ class Ordinal(Scale):
 
 @dataclass
 class RawScore:
-    """What a scorer produces, before the harness normalizes it.
-
-    Scorers (programmatic or LLM-judge) only commit to the raw value and an
-    optional rationale. The harness validates ``raw`` against the metric's
-    scale and lifts a ``RawScore`` to a :class:`Score` by computing
-    ``normalized``. This keeps the user-facing contract minimal and the
-    downstream type (``Score.normalized``) honest (always present).
-
-    Args:
-        raw: Raw score in the metric's native scale.
-        reason: Optional rationale (typically populated by LLM judges).
-    """
+    """Pre-normalization scorer output."""
 
     raw: int | float | str
     reason: str = ""
@@ -115,16 +99,10 @@ class RawScore:
 
 @dataclass
 class Score:
-    """The evaluation result for one example and one metric.
+    """Evaluation result for one (example, metric).
 
-    Produced by the harness from a :class:`RawScore` plus the metric's
-    scale. ``normalized`` is always populated — downstream aggregates rely
-    on this invariant.
-
-    Args:
-        raw: Raw score in the metric's native scale.
-        normalized: ``raw`` mapped to ``[0, 1]`` for cross-metric aggregation.
-        reason: Optional rationale (typically populated by LLM judges).
+    Produced by the harness from a :class:`RawScore` and the metric's scale.
+    ``normalized`` is always populated — downstream aggregates rely on this.
     """
 
     raw: int | float | str
@@ -163,14 +141,7 @@ class LLMJudgeScorer(Protocol):
 
 @dataclass
 class ProgrammaticMetric:
-    """A metric whose scorer is plain Python.
-
-    Args:
-        name: Unique identifier used in aggregates.
-        description: Human-readable explanation of what is measured.
-        scale: Scale used to validate and normalize raw scores.
-        scorer: callable that produces the score for the given output.
-    """
+    """A metric whose scorer is plain Python."""
 
     name: str
     description: str
@@ -185,19 +156,9 @@ default_judge_template = (Path(__file__).parent / "prompt_templates" / "judge.ji
 class LLMJudgeMetric:
     """A metric scored by an LLM judge.
 
-    Args:
-        name: Unique identifier used in aggregates.
-        description: Human-readable explanation of what is measured. The
-            default judge surfaces this to the judging model as ``METRIC``.
-        scale: Scale used to validate and normalize raw scores.
-        scorer: LLM-judge callable producing the score.
-        config: How to invoke the judge model (model id, gen kwargs,
-            optional output schema).
-        prompt_template: Jinja-style template the judge renders before
-            calling the model. Defaults to ``default_judge_template``.
-        repeats: how many times to run the judge per trial. Captures judge
-            stochasticity independently from program stochasticity. Each repeat
-            becomes its own ``Scoring`` tagged with ``replicate``.
+    ``description`` is surfaced to the default judge as ``METRIC``. ``repeats``
+    captures judge stochasticity; each repeat becomes its own ``Scoring``
+    tagged with ``replicate``.
     """
 
     name: str
@@ -210,11 +171,7 @@ class LLMJudgeMetric:
 
 
 Metric = ProgrammaticMetric | LLMJudgeMetric
-"""Tagged union of metric kinds.
-
-Dispatch with ``isinstance`` — the two variants carry different state
-(only ``LLMJudgeMetric`` needs a model and a judge template).
-"""
+"""Programmatic or LLM-judge metric (dispatch with ``isinstance``)."""
 
 
 # ---------------------------------------------------------------------------
@@ -627,10 +584,8 @@ def score_metric(trial: Trial, metric: Metric, replicate: int = 0) -> Scoring:
 
     Total function: any exception (scorer crash, malformed judge output,
     out-of-scale value) is captured into a :class:`FailedScoring`.
-
     Failed trials short-circuit to a sentinel zero score so they still
-    contribute to quality aggregates — the program is what is under
-    evaluation.
+    contribute to quality aggregates.
     """
     if isinstance(trial, FailedTrial):
         return SuccessfulScoring(

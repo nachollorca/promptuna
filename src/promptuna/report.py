@@ -148,12 +148,8 @@ def render_run(results: RunResults, *, telemetry: bool = True, legend: bool = Tr
 
     Args:
         results: The run to render.
-        telemetry: When ``False``, omit the telemetry section (optimizer context).
-        legend: When ``True``, prepend score semantics before the sections.
-
-    Returns:
-        Markdown with quality, reliability, and weak examples; telemetry is
-        included when ``telemetry=True``.
+        telemetry: Omit the telemetry section when ``False``.
+        legend: Prepend score semantics when ``True``.
     """
     sections: list[str] = []
     if legend:

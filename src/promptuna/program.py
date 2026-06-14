@@ -1,4 +1,4 @@
-"""Configuration for what is under test.
+"""Defines the unit that we want to evaluate and optimize.
 
 An :class:`Experiment` wires a :class:`Program` (prompt template + LM config)
 that the harness runs over a dataset of :class:`Example` rows.
@@ -12,15 +12,9 @@ from typing import Any, Protocol
 class Example:
     """A single dataset row.
 
-    ``reference`` is optional because some metrics do not require ground truth.
-    For example: "is length less than X?" is measured on the output w/o reference.
-
-    Args:
-        inputs: Arbitrary inputs the program needs — domain objects, raw text,
-            whatever the production caller would pass. Unpacked as keyword
-            arguments into the :class:`Program`; the keys must match the
-            program's parameter names.
-        reference: Expected output, if available.
+    ``inputs`` keys must match the :class:`Program` parameter names (unpacked
+    as keyword arguments). ``reference`` is optional — not all metrics need
+    ground truth.
     """
 
     inputs: dict[str, Any]
@@ -28,22 +22,14 @@ class Example:
 
 
 @dataclass
-class LMConfig:  # I am not sure if this is the best name. Maybe we can run with LM alone or Model
+class LMConfig:
     """How to invoke a language model.
 
-    Uniform across program, judge, and optimizer call sites — none
-    of them need anything more than this to dispatch a completion.
-
-    Args:
-        model: Identifier of the model to call.
-        generation_kwargs: Extra arguments forwarded to the model call.
+    Shared across program, judge, and optimizer call sites.
 
     Note:
         Structured-output schemas are intentionally *not* part of this
-        config. The expected response shape is the caller's responsibility:
-        a program defines the schema it needs internally, and LLM
-        judges build their own schema from the metric's scale. ``LMConfig``
-        only carries what is genuinely shared across call sites.
+        config. Callers define the response shape they need.
     """
 
     model: str
@@ -78,15 +64,8 @@ class Program(Protocol):
 class Experiment:
     """A named program plus the prompt and LM config under test.
 
-    Args:
-        program: The function under evaluation.
-        prompt_template: Jinja-style template the program renders before
-            calling the model.
-        config: How to invoke the program model.
-        repeats: How many times to run the program per example. LLMs are
-            stochastic, so >1 yields a distribution of outputs per example
-            instead of a point estimate. Each repeat becomes its own
-            :class:`~promptuna.run.Trial` tagged with ``replicate``.
+    Each ``repeats`` run becomes its own :class:`~promptuna.run.Trial` tagged
+    with ``replicate``.
     """
 
     program: Program
