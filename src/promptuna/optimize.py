@@ -1,6 +1,6 @@
 """Prompt-template optimization.
 
-Closes the loop around :func:`lmeh.evaluate.run_experiment`: given a fixed
+Closes the loop around :func:`promptuna.evaluate.run_experiment`: given a fixed
 model and a set of metrics, search for a prompt template that scores better
 on a flat ``list[Example]``.
 
@@ -19,9 +19,9 @@ from typing import Protocol
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
 
-from lmeh.evaluate import Metric, RunResults, run_experiment
-from lmeh.program import Example, Experiment, LMConfig
-from lmeh.report import _render_legend, render_run
+from promptuna.evaluate import Metric, RunResults, run_experiment
+from promptuna.program import Example, Experiment, LMConfig
+from promptuna.report import _render_legend, render_run
 
 default_proposer_template = (
     Path(__file__).parent / "prompt_templates" / "optimizer.jinja"
@@ -137,7 +137,7 @@ def default_proposer(
     """Render the trajectory and ask the model for a better template.
 
     Renders ``template`` with the ``HISTORY`` produced by
-    :func:`~lmeh.report.render_history` and calls the model with structured output, so the
+    :func:`~promptuna.report.render_history` and calls the model with structured output, so the
     returned value is a clean template string rather than free-form prose.
 
     Args:
@@ -175,7 +175,7 @@ def optimize(
 ) -> OptimizationResult:
     """Search for a prompt template that scores better on ``examples``.
 
-    Mirrors :func:`lmeh.evaluate.run_experiment`: same positional contract
+    Mirrors :func:`promptuna.evaluate.run_experiment`: same positional contract
     (``experiment``, ``examples``, ``metrics``), operating on a flat
     ``list[Example]`` with no train/test split — holdout evaluation is the
     caller's responsibility.
@@ -245,7 +245,7 @@ def render_history(steps: list[Step]) -> str:
     Pure function over the archive. Opens with a one-time legend, then each
     checkpoint is a ``## Step N`` heading with role/score/delta metadata, a
     ``<template>`` block with the exact template, and the shared
-    :func:`~lmeh.report.render_run` body (without telemetry or per-step legends).
+    :func:`~promptuna.report.render_run` body (without telemetry or per-step legends).
 
     Args:
         steps: Chronological archive; ``steps[0]`` is the baseline.

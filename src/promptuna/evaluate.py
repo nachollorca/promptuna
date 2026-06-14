@@ -7,9 +7,9 @@ Two entry points:
   as soon as they are ready, so callers can render progress or persist
   partial results and survive mid-run crashes.
 
-Both share the same threaded engine. :func:`~lmeh.run.run_trial` and
+Both share the same threaded engine. :func:`~promptuna.run.run_trial` and
 :func:`score_metric` are total functions: they never raise, instead wrapping
-failures into :class:`~lmeh.run.FailedTrial` / :class:`FailedScoring` so the
+failures into :class:`~promptuna.run.FailedTrial` / :class:`FailedScoring` so the
 executor loop stays simple.
 """
 
@@ -24,8 +24,8 @@ from typing import Any, Literal, Protocol
 from lmdk import CompletionResponse, complete, render_template
 from pydantic import BaseModel, ConfigDict, create_model
 
-from lmeh.program import Example, Experiment, LMConfig
-from lmeh.run import FailedTrial, SuccessfulTrial, Trial, run_trial
+from promptuna.program import Example, Experiment, LMConfig
+from promptuna.run import FailedTrial, SuccessfulTrial, Trial, run_trial
 
 # ---------------------------------------------------------------------------
 # Scoring: scales, scores, scorers, metrics

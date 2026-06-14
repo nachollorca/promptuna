@@ -86,7 +86,7 @@ class Experiment:
         repeats: How many times to run the program per example. LLMs are
             stochastic, so >1 yields a distribution of outputs per example
             instead of a point estimate. Each repeat becomes its own
-            :class:`~lmeh.run.Trial` tagged with ``replicate``.
+            :class:`~promptuna.run.Trial` tagged with ``replicate``.
     """
 
     program: Program

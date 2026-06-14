@@ -1,6 +1,6 @@
 # Project metadata ------------------------------------------------------------
 [project]
-name = "lmeh"
+name = "promptuna"
 version = "1.9.0"
 description = "Language Model Evaluation Harness"
 requires-python = ">=3.13"

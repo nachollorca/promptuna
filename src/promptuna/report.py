@@ -1,6 +1,6 @@
-"""Render :class:`~lmeh.evaluate.RunResults` and optimization trajectories as markdown."""
+"""Render :class:`~promptuna.evaluate.RunResults` and optimization trajectories as markdown."""
 
-from lmeh.evaluate import Aggregate, Example, RunResults
+from promptuna.evaluate import Aggregate, Example, RunResults
 
 _MAX_WEAK_EXAMPLES = 3
 
