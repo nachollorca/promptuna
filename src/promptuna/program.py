@@ -1,4 +1,4 @@
-"""Configuration for what is under test.
+"""Defines the unit that we want to evaluate and optimize.
 
 An :class:`Experiment` wires a :class:`Program` (prompt template + LM config)
 that the harness runs over a dataset of :class:`Example` rows.
@@ -22,7 +22,7 @@ class Example:
 
 
 @dataclass
-class LMConfig:  # I am not sure if this is the best name. Maybe we can run with LM alone or Model
+class LMConfig:
     """How to invoke a language model.
 
     Shared across program, judge, and optimizer call sites.
