@@ -30,12 +30,7 @@ default_proposer_template = (
 
 @dataclass(frozen=True)
 class Step:
-    """One checkpoint in the search: a candidate template and how it scored.
-
-    Args:
-        prompt_template: The candidate template that was evaluated.
-        result: The full run produced by evaluating it on the examples.
-    """
+    """One search checkpoint: a candidate template and how it scored."""
 
     prompt_template: str
     result: RunResults
@@ -48,13 +43,7 @@ class Step:
 
 @dataclass
 class OptimizationResult:
-    """The full archive produced by :func:`optimize`.
-
-    Args:
-        steps: Every checkpoint in chronological order. ``steps[0]`` is the
-            baseline (the experiment's original template); each later entry is
-            a proposed candidate.
-    """
+    """Archive from :func:`optimize`; ``steps[0]`` is the baseline."""
 
     steps: list[Step]
 
@@ -134,19 +123,15 @@ class Output(BaseModel):
 def default_proposer(
     steps: list[Step], config: LMConfig, template: str = default_proposer_template
 ) -> str:
-    """Render the trajectory and ask the model for a better template.
-
-    Renders ``template`` with the ``HISTORY`` produced by
-    :func:`~promptuna.report.render_history` and calls the model with structured output, so the
-    returned value is a clean template string rather than free-form prose.
+    """Propose a new template from the trajectory via structured output.
 
     Args:
-        steps: Chronological archive built by :func:`optimize`.
-        config: Model id and generation kwargs for the proposer call.
-        template: Proposer prompt template; expects a ``HISTORY`` variable.
+        steps: Chronological archive from :func:`optimize`.
+        config: Proposer model and generation kwargs.
+        template: Jinja template; expects a ``HISTORY`` variable.
 
     Returns:
-        The proposed prompt template.
+        Proposed prompt template.
     """
     prompt = render_template(
         template=template,
@@ -173,34 +158,23 @@ def optimize(
     proposer: Proposer = default_proposer,
     workers: int = 1,
 ) -> OptimizationResult:
-    """Search for a prompt template that scores better on ``examples``.
+    """Search for a higher-scoring prompt template on ``examples``.
 
-    Mirrors :func:`promptuna.evaluate.run_experiment`: same positional contract
-    (``experiment``, ``examples``, ``metrics``), operating on a flat
-    ``list[Example]`` with no train/test split — holdout evaluation is the
-    caller's responsibility.
-
-    The loop is: evaluate the experiment's current template as the baseline
-    (step 0), then for each of ``steps`` iterations render the trajectory, ask
-    ``proposer`` for a new template, evaluate it, and append it to the archive.
-    The objective is fixed to ``RunResults.overall.mean``. Proposing stops once
-    a checkpoint reaches a perfect overall score (``>= 1.0``), or the budgeted
-    ``steps`` are exhausted. :attr:`OptimizationResult.best` selects the winner,
-    which does not need to be the last step.
+    Same contract as :func:`promptuna.evaluate.run_experiment` (no train/test
+    split — holdout evaluation is the caller's responsibility). See the module
+    docstring for loop details.
 
     Args:
-        experiment: Carries the program, the baseline ``prompt_template``, and
-            the (fixed) program model config. Not mutated — each candidate is
-            evaluated on a copy.
+        experiment: Baseline program and template; not mutated per candidate.
         examples: Dataset to optimize against.
-        metrics: Metrics to score each run; combined via.
-        proposer: Candidate generator. Defaults to :func:`default_proposer`.
-        proposer_config: Model id and generation kwargs for the proposer.
-        steps: Number of candidates to propose beyond the baseline (``>= 0``).
-        workers: Thread-pool size forwarded to each ``run_experiment`` call.
+        metrics: Scoring metrics for each candidate run.
+        proposer_config: Model for the proposer.
+        steps: Candidates to propose beyond the baseline (``>= 0``).
+        proposer: Candidate generator; defaults to :func:`default_proposer`.
+        workers: Thread-pool size per ``run_experiment`` call.
 
     Returns:
-        The chronological archive and its best step.
+        Chronological archive; see :attr:`OptimizationResult.best`.
     """
     if steps < 0:
         raise ValueError(f"steps must be >= 0, got {steps}")
@@ -240,18 +214,10 @@ def _render_step_heading(step: Step, index: int, baseline_score: float, is_best:
 
 
 def render_history(steps: list[Step]) -> str:
-    """Render the chronological trajectory into the proposer's context string.
-
-    Pure function over the archive. Opens with a one-time legend, then each
-    checkpoint is a ``## Step N`` heading with role/score/delta metadata, a
-    ``<template>`` block with the exact template, and the shared
-    :func:`~promptuna.report.render_run` body (without telemetry or per-step legends).
-
-    Args:
-        steps: Chronological archive; ``steps[0]`` is the baseline.
+    """Render the trajectory for the proposer's ``HISTORY`` context.
 
     Returns:
-        A human-readable, model-facing string. Empty input yields ``""``.
+        Human-readable string; empty input yields ``""``.
     """
     if not steps:
         return ""
