@@ -31,20 +31,6 @@ The loop above maps directly onto the package layout:
 
 Prompt-template search (OPRO-style) treats evaluation as **multi-criteria**: each candidate is scored on several normalized metrics, forming a quality vector in metric space. Before comparing checkpoints, that vector is collapsed by a fixed **linear scalarization**—the unweighted mean of per-metric means (`RunResults.overall.mean`), a compensatory aggregation where gains on one metric can offset losses on another. The search is therefore **single-objective** in template space: it maximizes one scalar utility, keeps the best checkpoint seen so far, and does not explore a Pareto front over metrics. The proposer still receives per-metric breakdowns in the trajectory (`render_history`); only ranking and early stopping use the headline score.
 
-Given metrics $m_1,\ldots,m_K$ on dataset $D$, a template $T$ scores
-
-$$
-U(T) = \frac{1}{K}\sum_{i=1}^{K} \frac{1}{|D|}\sum_{j\in D} \mathbb{E}_r\!\left[s_{i,j}^{(r)}(T)\right]
-$$
-
-Optimization keeps the best checkpoint in the archive $\mathcal{A} = \{T_0, \ldots, T_B\}$:
-
-$$
-T^\* = \arg\max_{T \in \mathcal{A}} U(T)
-$$
-
-Early stop when $U \ge 1$; each proposal is $T_{b+1} = P(\mathcal{A})$ (LM proposer fed the full scored trajectory).
-
 ## Inspiration
 
 `promptuna` is a proud Frankenstein of [DSPy](https://github.com/stanfordnlp/dspy), [Ragas](https://github.com/vibrantlabsai/ragas), [OPRO](https://arxiv.org/pdf/2309.03409)] and [Optuna](https://github.com/optuna/optuna).
