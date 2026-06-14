@@ -1,4 +1,4 @@
-"""Execute a :class:`~lmeh.program.Program` against dataset rows.
+"""Execute a :class:`~promptuna.program.Program` against dataset rows.
 
 :func:`run_trial` is a total function: it never raises, wrapping failures into
 :class:`FailedTrial` so callers can treat crashed programs as data.
@@ -9,7 +9,7 @@ from typing import Any
 
 from lmdk import CompletionRequest, CompletionResponse, observe
 
-from lmeh.program import Example, LMConfig, Program
+from promptuna.program import Example, LMConfig, Program
 
 
 @dataclass(frozen=True)
