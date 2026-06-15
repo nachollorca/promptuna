@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.11.0 (2026-06-15)
+
+### Features
+
+- **program**: Add dataset loader
+  ([`b07f44f`](https://github.com/nachollorca/promptuna/commit/b07f44f31f306748f0e42cf811aac96c6720645e))
+
+### Refactoring
+
+- **loader**: Move to its own module
+  ([`f8f360d`](https://github.com/nachollorca/promptuna/commit/f8f360dab9c7d79c2d5ab374114fa08b2fef4a6b))
+
+
 ## v1.10.0 (2026-06-15)
 
 ### Documentation
