@@ -2,6 +2,44 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-06-15)
+
+### Documentation
+
+- Add inspo and math to readme
+  ([`d75fd0f`](https://github.com/nachollorca/promptuna/commit/d75fd0fee6fdc4fa99c2a2ba3c2fac8c720646a9))
+
+- Remove comment that had been cleared out
+  ([`2bf837d`](https://github.com/nachollorca/promptuna/commit/2bf837d6214f6f119a39b81cf257f77b7a4b24c5))
+
+- Remove the pedantic mathy
+  ([`ae850c1`](https://github.com/nachollorca/promptuna/commit/ae850c1b9b80bdb8256e456f3b9ec8201bf2db5a))
+
+- Trim redundant docstrings
+  ([`ba0d109`](https://github.com/nachollorca/promptuna/commit/ba0d109d02aa0e587561b6376b02cbeec589724b))
+
+- **readme**: Add silly diagram for improvement loop
+  ([`aee1dee`](https://github.com/nachollorca/promptuna/commit/aee1dee47bb7cb908ebbd9a73c261700d06b09f3))
+
+### Features
+
+- Edit readme but call it feat to trigger first pypi release
+  ([`4ef14cc`](https://github.com/nachollorca/promptuna/commit/4ef14cc70ea8ae8ae891fe33202bc396c629082a))
+
+### Refactoring
+
+- Rename lmeh to promptuna
+  ([`d0b44be`](https://github.com/nachollorca/promptuna/commit/d0b44be184701069486056196310a97da7b40efa))
+
+- Reorganize the layout
+  ([`ba8229d`](https://github.com/nachollorca/promptuna/commit/ba8229de96bfa90e603533528207991185a0e985))
+
+### Testing
+
+- Draft test suite
+  ([`9f970bd`](https://github.com/nachollorca/promptuna/commit/9f970bde5006bf6b73864be095133046527f15c6))
+
+
 ## v1.9.0 (2026-06-12)
 
 ### Documentation
