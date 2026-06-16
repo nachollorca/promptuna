@@ -34,6 +34,60 @@ def test_render_run_reports_all_perfect_when_no_weak_examples(experiment, exampl
     assert "All examples scored perfectly." in markdown
 
 
+def test_render_run_weak_context_inputs_shows_dataset_inputs(experiment, examples, exact_match_metric):
+    results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
+    markdown = render_run(results, telemetry=False, weak_context="inputs")
+
+    assert repr(examples[1].inputs) in markdown
+    assert "Rendered prompt" not in markdown
+    assert "**Output**" not in markdown
+
+
+def test_render_run_weak_context_trial_shows_rendered_prompt_and_output(
+    experiment, examples, exact_match_metric
+):
+    weak_example = examples[1]
+    trial = make_trial(
+        weak_example,
+        output=[0, 2],
+        rendered_prompt="[0] first sentence\n[1] second sentence",
+    )
+    results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
+    results.trials[1] = trial
+    results.scorings[1] = SuccessfulScoring(
+        trial=trial,
+        metric=exact_match_metric,
+        score=results.scorings[1].score,
+    )
+
+    markdown = render_run(results, telemetry=False, weak_context="trial")
+
+    assert "[0] first sentence" in markdown
+    assert "Rendered prompt" in markdown
+    assert "**Output**: `[0, 2]`" in markdown
+    assert repr(weak_example.inputs) not in markdown
+
+
+def test_render_run_weak_context_trial_falls_back_to_inputs_without_successful_trial(
+    experiment, example, exact_match_metric
+):
+    failed_trial = FailedTrial(example=example, error=RuntimeError("boom"))
+    results = make_run_results(experiment, [example], exact_match_metric, scores=[0.25])
+    results.trials = [failed_trial]
+    results.scorings = [
+        SuccessfulScoring(
+            trial=failed_trial,
+            metric=exact_match_metric,
+            score=Score(raw=0.25, normalized=0.25, reason="trial failed"),
+        )
+    ]
+
+    markdown = render_run(results, telemetry=False, weak_context="trial")
+
+    assert repr(example.inputs) in markdown
+    assert "Rendered prompt" not in markdown
+
+
 def test_render_run_reports_trial_and_scoring_failures(experiment, example, exact_match_metric):
     failed_trial = FailedTrial(example=example, error=RuntimeError("boom"))
     failed_scoring = FailedScoring(

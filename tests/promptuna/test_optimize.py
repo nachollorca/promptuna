@@ -9,7 +9,7 @@ from helpers import make_run_results, make_trial
 from lmdk import CompletionResponse
 from pydantic import BaseModel
 
-from promptuna.evaluate import RunInfo, RunResults
+from promptuna.evaluate import RunInfo, RunResults, SuccessfulScoring
 from promptuna.optimize import (
     Advice,
     OptimizationResult,
@@ -73,6 +73,29 @@ def test_render_history_marks_best_step_and_includes_templates(
     assert "<template>" in history
     assert "better template" in history
     assert "Δ +0.50 vs baseline" in history
+
+
+def test_render_history_uses_trial_weak_context(experiment, examples, exact_match_metric):
+    weak_example = examples[0]
+    trial = make_trial(
+        weak_example,
+        output="wrong",
+        rendered_prompt="Classify: indexed prompt text",
+    )
+    result = make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.4])
+    result.trials[0] = trial
+    result.scorings[0] = SuccessfulScoring(
+        trial=trial,
+        metric=exact_match_metric,
+        score=result.scorings[0].score,
+    )
+    step = Step(prompt_template="baseline template", result=result)
+
+    history = render_history([step])
+
+    assert "Classify: indexed prompt text" in history
+    assert "**Output**: `'wrong'`" in history
+    assert "Rendered prompt" in history
 
 
 def test_render_metrics_is_empty_without_steps():
