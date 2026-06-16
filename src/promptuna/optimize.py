@@ -12,16 +12,20 @@ checkpoint, so the search may regress without losing the winner. Proposing
 stops early once a checkpoint scores perfectly (``overall.mean >= 1.0``).
 """
 
+import inspect
+import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
 
 from promptuna.evaluate import Metric, RunResults, run_experiment
 from promptuna.program import Example, Experiment, LMConfig
-from promptuna.report import _render_legend, render_run
+from promptuna.report import render_run
+
+logger = logging.getLogger(__name__)
 
 default_proposer_template = (
     Path(__file__).parent / "prompt_templates" / "optimizer.jinja"
@@ -109,6 +113,24 @@ class Thinking(BaseModel):
     )
 
 
+class Advice(BaseModel):
+    """A recommendation that falls *outside* the editable prompt template.
+
+    The optimizer only varies the template, but program behaviour is shaped by
+    the whole program (schema + scaffold + model). When the proposer spots a
+    bottleneck it cannot fix from the template — e.g. a missing schema field
+    description or a lossy post-processing fallback — it records it here for a
+    human to act on, instead of forcing the change into the template.
+    """
+
+    target: Literal["output_schema", "pre_processing", "post_processing", "model", "other"] = Field(
+        description="Which fixed part of the program the suggestion applies to."
+    )
+    suggestion: str = Field(
+        description="A concrete, actionable change, grounded in the failure analysis."
+    )
+
+
 class Output(BaseModel):
     """Structured-output schema for :func:`default_proposer`."""
 
@@ -118,6 +140,38 @@ class Output(BaseModel):
     prompt_template: str = Field(
         description="The new prompt template candidate grounded on the analysis of the trajectory."
     )
+    advices: list[Advice] | None = Field(
+        default=None,
+        description=(
+            "Recommendations outside the editable template (schema, pre/post-processing), if any. "
+            "Use when the trajectory shows no signs of improvement by just touching the template."
+        ),
+    )
+
+
+def extract_output_schema(steps: list[Step]) -> str | None:
+    """Python source of the program's structured-output schema, recovered from telemetry.
+
+    Uses :func:`inspect.getsource` on the recovered Pydantic model class — same
+    no-fallback policy as :func:`extract_program_source`.
+    """
+    for step in steps:
+        for trial in step.result.successful_trials:
+            request = trial.request
+            if request is not None and request.output_schema is not None:
+                return inspect.getsource(request.output_schema)
+    return None
+
+
+def extract_program_source(steps: list[Step]) -> str:
+    """Python source of the program under optimization.
+
+    Uses :func:`inspect.getsource` with no fallback — if introspection fails
+    (notebooks, ``functools.partial``, C extensions, etc.), the error propagates.
+    """
+    program = steps[0].result.experiment.program if steps else None
+    assert program is not None
+    return inspect.getsource(program)
 
 
 def default_proposer(
@@ -128,7 +182,8 @@ def default_proposer(
     Args:
         steps: Chronological archive from :func:`optimize`.
         config: Proposer model and generation kwargs.
-        template: Jinja template; expects a ``HISTORY`` variable.
+        template: Jinja template; expects ``HISTORY``, ``OUTPUT_SCHEMA``, and
+            ``PROGRAM_SOURCE`` variables.
 
     Returns:
         Proposed prompt template.
@@ -136,6 +191,8 @@ def default_proposer(
     prompt = render_template(
         template=template,
         HISTORY=render_history(steps),
+        OUTPUT_SCHEMA=extract_output_schema(steps),
+        PROGRAM_SOURCE=extract_program_source(steps),
         strip_curly_brackets=False,
     )
     response = complete(
@@ -146,6 +203,8 @@ def default_proposer(
     )
     parsed = response.parsed
     assert parsed is not None, "proposer model returned no structured output"
+    for advice in parsed.advices or []:
+        logger.info("optimizer advice [%s]: %s", advice.target, advice.suggestion)
     return parsed.prompt_template
 
 
@@ -225,21 +284,13 @@ def render_history(steps: list[Step]) -> str:
     baseline_score = steps[0].score
     best_index = max(range(len(steps)), key=lambda i: steps[i].score)
 
-    preamble = "\n\n".join(
-        [
-            "## How to read these results",
-            "",
-            _render_legend(trajectory=True),
-        ]
-    )
-
     step_blocks: list[str] = []
     for i, step in enumerate(steps):
         sections = [
             _render_step_heading(step, i, baseline_score, is_best=i == best_index),
             f"<template>\n{step.prompt_template}\n</template>",
-            render_run(step.result, telemetry=False, legend=False),
+            render_run(step.result, telemetry=False),
         ]
         step_blocks.append("\n\n".join(sections))
 
-    return preamble + "\n\n" + "\n\n---\n\n".join(step_blocks)
+    return "\n\n---\n\n".join(step_blocks)

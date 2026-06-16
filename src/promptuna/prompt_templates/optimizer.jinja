@@ -1,18 +1,63 @@
-We have a function that calls a language model to accomplish a task.
+We have a Program: a function that calls a language model to accomplish a task.
 Its output quality is measured by one or more metrics over a fixed dataset.
 Each metric is normalized to [0, 1] and combined into a single headline score (higher is better).
 
 We are searching for a prompt template that maximizes that headline score.
 
-Below is the full optimization trajectory in chronological order.
-A legend at the top explains how to read the scores and sections.
+## Program (fixed)
+
+The **program** is everything that turns inputs into evaluated outputs. It has three parts:
+
+1. **Pre-processing** — deterministic setup before the LM call (argument shaping, truncation, etc.).
+2. **Completion** — the **prompt template** (the only part you may edit) plus the **output schema** (fixed structured-output contract, when present).
+3. **Post-processing** — deterministic handling after the LM returns (parsing, coercion, fallbacks).
+
+We are searching exclusively over the prompt template space.
+The output schema, model, and pre/post-processing are fixed.
+Do not try to change them through the template.
+
+{% if OUTPUT_SCHEMA %}
+### Output schema (fixed)
+
+The program enforces this structured-output contract on the model. Do not restate constraints it already guarantees (types, enums, required fields); spend the template on *populating* these fields well.
+
+```python
+{{ OUTPUT_SCHEMA }}
+```
+{% endif %}
+
+### Program source (fixed)
+
+The deterministic scaffold around the LM call (pre/post-processing) is **not** editable. Account for it — truncation, parsing, coercion, fallbacks — instead of duplicating or fighting it from the template.
+
+```python
+{{ PROGRAM_SOURCE }}
+```
+
+## Trajectory
+
+### How to read these results
+
+Headline score is the mean across per-metric means (each metric weighted equally).
+
+Each quality table cell is `mean ± sd (n)`. `Score` aggregates per-example means (dispersion = dataset heterogeneity); `Replicate noise` is the average within-cell SD across replicates (dispersion = measurement instability).
+
+Trial failures count against the run (the program is under evaluation); scorer failures are excluded from quality aggregates.
+
+Each `## Step N` heading shows role (baseline or candidate), headline score, delta vs baseline (candidates only), and `⭐ best` on the winning step so far.
+
+Each step opens with the verbatim template in a `template` block, then the quality, reliability, and weak-example results it produced.
 
 {{ HISTORY }}
 
-Study the trajectory:
-infer what changes helped, what hurt, and where the current best prompt still fails.
+## Goal
+
+Study the trajectory: infer what changes helped, what hurt, and where the current best prompt still fails.
 Then write an improved prompt template.
-You may refine the best checkpoint or explore a different approach.
+You may refine the best checkpoint or explore a completely different approach.
+
+If the real bottleneck lies outside the template, record it as an advice for human review instead of forcing it into the template.
+This can be a schema field that needs a clearer description, lossy pre/post-processing, an output contract that cannot express the task, a model that is too bad...
 
 Keep every Jinja placeholder (enclosed in double curly braces) from the templates above exactly as-is (same names and syntax).
 Removing or renaming them breaks rendering and makes the template unusable.
