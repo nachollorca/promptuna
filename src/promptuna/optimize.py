@@ -83,8 +83,8 @@ class Thinking(BaseModel):
     failure_analysis: str = Field(
         description=(
             "Analyze the weakest examples from the best (or latest) checkpoint. "
-            "Cluster failure modes using judge reasons; infer missing rubric, "
-            "ambiguity, or formatting issues — not generic advice."
+            "Cluster failure modes using the metric descriptions and judge reasons; "
+            "spot ambiguity and infer missing rubric — not generic advice."
         )
     )
     what_works: str = Field(
@@ -174,6 +174,20 @@ def extract_program_source(steps: list[Step]) -> str:
     return inspect.getsource(program)
 
 
+def render_metrics(steps: list[Step]) -> str:
+    """Markdown listing each metric's name and description (the scoring rubric)."""
+    by_name: dict[str, Metric] = {}
+    for step in steps:
+        for scoring in step.result.successful_scorings:
+            by_name.setdefault(scoring.metric.name, scoring.metric)
+
+    blocks: list[str] = []
+    for name in sorted(by_name):
+        metric = by_name[name]
+        blocks.append(f"### `{metric.name}`\n\n{metric.description}")
+    return "\n\n".join(blocks)
+
+
 def default_proposer(
     steps: list[Step], config: LMConfig, template: str = default_proposer_template
 ) -> str:
@@ -182,8 +196,8 @@ def default_proposer(
     Args:
         steps: Chronological archive from :func:`optimize`.
         config: Proposer model and generation kwargs.
-        template: Jinja template; expects ``HISTORY``, ``OUTPUT_SCHEMA``, and
-            ``PROGRAM_SOURCE`` variables.
+        template: Jinja template; expects ``HISTORY``, ``METRICS``, ``OUTPUT_SCHEMA``,
+            and ``PROGRAM_SOURCE`` variables.
 
     Returns:
         Proposed prompt template.
@@ -191,6 +205,7 @@ def default_proposer(
     prompt = render_template(
         template=template,
         HISTORY=render_history(steps),
+        METRICS=render_metrics(steps),
         OUTPUT_SCHEMA=extract_output_schema(steps),
         PROGRAM_SOURCE=extract_program_source(steps),
         strip_curly_brackets=False,

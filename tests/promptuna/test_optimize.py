@@ -17,6 +17,7 @@ from promptuna.optimize import (
     Step,
     Thinking,
     default_proposer,
+    render_metrics,
     extract_output_schema,
     extract_program_source,
     optimize,
@@ -72,6 +73,20 @@ def test_render_history_marks_best_step_and_includes_templates(
     assert "<template>" in history
     assert "better template" in history
     assert "Δ +0.50 vs baseline" in history
+
+
+def test_render_metrics_is_empty_without_steps():
+    assert render_metrics([]) == ""
+
+
+def test_render_metrics_lists_name_and_description(experiment, examples, exact_match_metric):
+    results = make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.5])
+    step = Step(prompt_template="t", result=results)
+
+    markdown = render_metrics([step])
+
+    assert "### `exact_match`" in markdown
+    assert "Output must match the reference answer." in markdown
 
 
 def test_extract_output_schema_is_none_without_schema(experiment, examples, exact_match_metric):

@@ -34,6 +34,15 @@ The deterministic scaffold around the LM call (pre/post-processing) is **not** e
 {{ PROGRAM_SOURCE }}
 ```
 
+## Metrics (fixed)
+
+The headline score is the mean across these metrics (each weighted equally).
+Metrics are not editable — use each description as the rubric for what “good” means.
+
+{% if METRICS %}
+{{ METRICS }}
+{% endif %}
+
 ## Trajectory
 
 ### How to read these results
