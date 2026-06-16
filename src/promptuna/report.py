@@ -41,32 +41,6 @@ def _weakest_examples(result: RunResults, limit: int) -> list[WeakExampleEntry]:
     return ranked[:limit]
 
 
-def _render_legend(*, trajectory: bool = False) -> str:
-    """Render score semantics and section conventions once per report or trajectory."""
-    lines = [
-        "Headline score is the mean across per-metric means (each metric weighted equally).",
-        "",
-        "Each quality table cell is `mean ± sd (n)`. `Score` aggregates per-example "
-        "means (dispersion = dataset heterogeneity); `Replicate noise` is the average "
-        "within-cell SD across replicates (dispersion = measurement instability).",
-        "",
-        "Trial failures count against the run (the program is under evaluation); "
-        "scorer failures are excluded from quality aggregates.",
-    ]
-    if trajectory:
-        lines.extend(
-            [
-                "",
-                "Each `## Step N` heading shows role (baseline or candidate), headline score, "
-                "delta vs baseline (candidates only), and `⭐ best` on the winning step so far.",
-                "",
-                "Each step opens with the verbatim template in a `template` block, then the "
-                "quality, reliability, and weak-example results it produced.",
-            ]
-        )
-    return "\n".join(lines)
-
-
 def _render_quality(results: RunResults) -> str:
     """Render the quality section for a single run."""
     overall = results.overall
@@ -143,24 +117,18 @@ def _render_telemetry(results: RunResults) -> str:
     )
 
 
-def render_run(results: RunResults, *, telemetry: bool = True, legend: bool = True) -> str:
+def render_run(results: RunResults, *, telemetry: bool = True) -> str:
     """Render a single run as markdown sections.
 
     Args:
         results: The run to render.
         telemetry: Omit the telemetry section when ``False``.
-        legend: Prepend score semantics when ``True``.
     """
-    sections: list[str] = []
-    if legend:
-        sections.append(_render_legend())
-    sections.extend(
-        [
-            _render_quality(results),
-            _render_reliability(results),
-            _render_weak_examples(results),
-        ]
-    )
+    sections: list[str] = [
+        _render_quality(results),
+        _render_reliability(results),
+        _render_weak_examples(results),
+    ]
     if telemetry:
         sections.append(_render_telemetry(results))
     return "\n\n".join(sections)

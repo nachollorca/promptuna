@@ -105,13 +105,14 @@ def make_trial(
     *,
     output: Any = "4",
     rendered_prompt: str = "Answer: 2+2?",
+    output_schema: Any = None,
     replicate: int = 0,
 ) -> SuccessfulTrial:
     request = CompletionRequest(
         model_id="model",
         prompt=[UserMessage(content=rendered_prompt)],
         system_instruction=None,
-        output_schema=None,
+        output_schema=output_schema,
         generation_kwargs={"temperature": 0},
     )
     response = CompletionResponse(

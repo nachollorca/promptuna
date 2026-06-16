@@ -20,17 +20,16 @@ def test_render_run_includes_quality_reliability_and_weak_examples(
     assert "0.25" in markdown
 
 
-def test_render_run_can_hide_telemetry_and_legend(experiment, example, exact_match_metric):
+def test_render_run_can_hide_telemetry(experiment, example, exact_match_metric):
     results = make_run_results(experiment, [example], exact_match_metric, scores=[1.0])
-    markdown = render_run(results, telemetry=False, legend=False)
+    markdown = render_run(results, telemetry=False)
 
     assert "### Telemetry" not in markdown
-    assert "Headline score" not in markdown
 
 
 def test_render_run_reports_all_perfect_when_no_weak_examples(experiment, example, exact_match_metric):
     results = make_run_results(experiment, [example], exact_match_metric, scores=[1.0])
-    markdown = render_run(results, telemetry=False, legend=False)
+    markdown = render_run(results, telemetry=False)
 
     assert "All examples scored perfectly." in markdown
 
@@ -53,7 +52,7 @@ def test_render_run_reports_trial_and_scoring_failures(experiment, example, exac
         failed_scoring,
     ]
 
-    markdown = render_run(results, telemetry=True, legend=False)
+    markdown = render_run(results, telemetry=True)
 
     assert "Trial failure rate" in markdown
     assert "Scoring failure rate" in markdown
