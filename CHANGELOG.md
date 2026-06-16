@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.12.0 (2026-06-16)
+
+### Features
+
+- **optimizer**: Add metric rubric to optimizer prompt
+  ([`92806bf`](https://github.com/nachollorca/promptuna/commit/92806bfa33a1ec79fe82865f93612c18b889ae2a))
+
+- **optimizer**: Show the scaffold and output schema of the program to the optimizer LM
+  ([`71b060e`](https://github.com/nachollorca/promptuna/commit/71b060e2de09501dc6bdb0b4d4e500668fbdf3ee))
+
+
 ## v1.11.0 (2026-06-15)
 
 ### Features
