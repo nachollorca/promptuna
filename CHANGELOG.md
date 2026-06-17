@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.0 (2026-06-17)
+
+### Features
+
+- **optimizer**: Improve prompt rendering
+  ([`4c6328b`](https://github.com/nachollorca/promptuna/commit/4c6328be27f0755b9f61408b3eda2e4a3b12848b))
+
+
 ## v1.13.0 (2026-06-17)
 
 ### Bug Fixes
