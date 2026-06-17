@@ -94,6 +94,47 @@ def _trial_for_example(results: RunResults, example: Example) -> SuccessfulTrial
     return None
 
 
+def _render_weak_example(
+    index: int,
+    example: Example,
+    mean_score: float,
+    breakdown: list[MetricBreakdown],
+    trial: SuccessfulTrial | None,
+) -> list[str]:
+    """Render one weak example as a ``<weak_example>``-delimited block.
+
+    The tag delimiter isolates each example from its neighbours and from the
+    surrounding report: a rendered prompt carries its own markup (code fences,
+    headings) that would otherwise bleed out. When ``trial`` is given, the block
+    shows the rendered prompt the LM saw and the program output; otherwise it
+    falls back to the raw dataset inputs. Either way it lists the per-metric
+    scores and judge reasons.
+    """
+    lines = [f"{index}. **mean {mean_score:.2f}**", "<weak_example>"]
+    if trial is not None:
+        lines.extend(
+            [
+                "**Rendered prompt** (what the LM saw):",
+                "<rendered_prompt>",
+                trial.rendered_prompt,
+                "</rendered_prompt>",
+                "**Output** (what the program returned):",
+                "<output>",
+                repr(trial.output),
+                "</output>",
+            ]
+        )
+    else:
+        lines.append(f"**Inputs**: `{example.inputs!r}`")
+    for metric_name, normalized, reason in breakdown:
+        detail = f"- `{metric_name}`: {normalized:.2f}"
+        if reason:
+            detail += f" — {reason}"
+        lines.append(detail)
+    lines.append("</weak_example>")
+    return lines
+
+
 def _render_weak_examples(
     results: RunResults, *, error_format: Literal["inputs", "rendered"] = "inputs"
 ) -> str:
@@ -102,28 +143,8 @@ def _render_weak_examples(
     lines = ["### Error analysis", ""]
     if weak:
         for i, (example, mean_score, breakdown) in enumerate(weak, start=1):
-            if error_format == "inputs":
-                lines.append(f"{i}. **mean {mean_score:.2f}** — `{example.inputs!r}`")
-            else:
-                trial = _trial_for_example(results, example)
-                if trial is None:
-                    lines.append(f"{i}. **mean {mean_score:.2f}** — `{example.inputs!r}`")
-                else:
-                    lines.extend(
-                        [
-                            f"{i}. **mean {mean_score:.2f}**",
-                            "   **Rendered prompt** (what the LM saw):",
-                            "   ```",
-                            trial.rendered_prompt,
-                            "   ```",
-                            f"   **Output**: `{trial.output!r}`",
-                        ]
-                    )
-            for metric_name, normalized, reason in breakdown:
-                detail = f"   - `{metric_name}`: {normalized:.2f}"
-                if reason:
-                    detail += f" — {reason}"
-                lines.append(detail)
+            trial = _trial_for_example(results, example) if error_format == "rendered" else None
+            lines.extend(_render_weak_example(i, example, mean_score, breakdown, trial))
     elif results.successful_scorings:
         lines.append("All examples scored perfectly.")
     else:
@@ -150,7 +171,7 @@ def render_run(
     results: RunResults,
     *,
     telemetry: bool = True,
-    error_format: Literal["inputs", "rendered"] = "inputs",
+    error_format: Literal["inputs", "rendered"] | None = "inputs",
 ) -> str:
     """Render a single run as markdown sections.
 
@@ -159,13 +180,15 @@ def render_run(
         telemetry: Omit the telemetry section when ``False``.
         error_format: How the error-analysis section shows each weak example — raw
             ``Example.inputs`` (``"inputs"``) or the rendered prompt and program
-            output from its trial (``"rendered"``).
+            output from its trial (``"rendered"``). ``None`` omits the error-analysis
+            section entirely (quality and reliability still render).
     """
     sections: list[str] = [
         _render_quality(results),
         _render_reliability(results),
-        _render_weak_examples(results, error_format=error_format),
     ]
+    if error_format is not None:
+        sections.append(_render_weak_examples(results, error_format=error_format))
     if telemetry:
         sections.append(_render_telemetry(results))
     return "\n\n".join(sections)

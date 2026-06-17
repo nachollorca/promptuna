@@ -298,13 +298,20 @@ def render_history(steps: list[Step]) -> str:
 
     baseline_score = steps[0].score
     best_index = max(range(len(steps)), key=lambda i: steps[i].score)
+    # Error analysis only earns its keep on the checkpoints the proposer is asked
+    # to act on: the best one it may refine and the latest one it just tried, both
+    # with rendered prompts. Superseded candidates omit it entirely — their score
+    # delta and template already carry the signal, and stale per-example detail
+    # just bloats the trajectory. ``best`` and ``last`` collapse when they coincide.
+    detailed = {best_index, len(steps) - 1}
 
     step_blocks: list[str] = []
     for i, step in enumerate(steps):
+        error_format = "rendered" if i in detailed else None
         sections = [
             _render_step_heading(step, i, baseline_score, is_best=i == best_index),
             f"<template>\n{step.prompt_template}\n</template>",
-            render_run(step.result, telemetry=False, error_format="rendered"),
+            render_run(step.result, telemetry=False, error_format=error_format),
         ]
         step_blocks.append("\n\n".join(sections))
 
