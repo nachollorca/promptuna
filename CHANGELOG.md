@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v1.13.0 (2026-06-17)
+
+### Bug Fixes
+
+- **optimizer**: Show weak examples only for best and last steps
+  ([`5a6a1ad`](https://github.com/nachollorca/promptuna/commit/5a6a1ad9510f1e06f39639d113781132fddbea22))
+
+### Features
+
+- **optimizer**: Show rendered prompt instead of bare inputs in error analysis
+  ([`68959b1`](https://github.com/nachollorca/promptuna/commit/68959b1b4c81daf10c80cc088342e3bda3403999))
+
+### Refactoring
+
+- Make a clear distinction between failure / error analysis / weakest example
+  ([`aa04449`](https://github.com/nachollorca/promptuna/commit/aa04449d48175781bcd28943bcaefe2f20a6d7f9))
+
+### Testing
+
+- **optimizer**: Add tests for weak example rendering
+  ([`426be9b`](https://github.com/nachollorca/promptuna/commit/426be9bd9dc4b1eba1ade701a7c4b2f93201744f))
+
+
 ## v1.12.0 (2026-06-16)
 
 ### Features
