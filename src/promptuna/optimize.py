@@ -16,7 +16,7 @@ import inspect
 import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
@@ -113,24 +113,6 @@ class Thinking(BaseModel):
     )
 
 
-class Advice(BaseModel):
-    """A recommendation that falls *outside* the editable prompt template.
-
-    The optimizer only varies the template, but program behaviour is shaped by
-    the whole program (schema + scaffold + model). When the proposer spots a
-    bottleneck it cannot fix from the template — e.g. a missing schema field
-    description or a lossy post-processing fallback — it records it here for a
-    human to act on, instead of forcing the change into the template.
-    """
-
-    target: Literal["output_schema", "pre_processing", "post_processing", "model", "other"] = Field(
-        description="Which fixed part of the program the suggestion applies to."
-    )
-    suggestion: str = Field(
-        description="A concrete, actionable change, grounded in the failure analysis."
-    )
-
-
 class Output(BaseModel):
     """Structured-output schema for :func:`default_proposer`."""
 
@@ -140,11 +122,11 @@ class Output(BaseModel):
     prompt_template: str = Field(
         description="The new prompt template candidate grounded on the analysis of the trajectory."
     )
-    advices: list[Advice] | None = Field(
+    advice: str | None = Field(
         default=None,
         description=(
             "Recommendations outside the editable template (schema, pre/post-processing), if any. "
-            "Use when the trajectory shows no signs of improvement by just touching the template."
+            "Use only when the trajectory is not improving by just touching the template."
         ),
     )
 
@@ -184,7 +166,7 @@ def render_metrics(steps: list[Step]) -> str:
     blocks: list[str] = []
     for name in sorted(by_name):
         metric = by_name[name]
-        blocks.append(f"### `{metric.name}`\n\n{metric.description}")
+        blocks.append(f"## `{metric.name}`\n\n{metric.description}")
     return "\n\n".join(blocks)
 
 
@@ -218,8 +200,6 @@ def default_proposer(
     )
     parsed = response.parsed
     assert parsed is not None, "proposer model returned no structured output"
-    for advice in parsed.advices or []:
-        logger.info("optimizer advice [%s]: %s", advice.target, advice.suggestion)
     return parsed.prompt_template
 
 
@@ -310,6 +290,8 @@ def render_history(steps: list[Step]) -> str:
         error_format = "rendered" if i in detailed else None
         sections = [
             _render_step_heading(step, i, baseline_score, is_best=i == best_index),
+            "### Template",
+            "",
             f"<template>\n{step.prompt_template}\n</template>",
             render_run(step.result, telemetry=False, error_format=error_format),
         ]

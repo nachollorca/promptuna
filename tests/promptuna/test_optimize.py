@@ -11,17 +11,16 @@ from pydantic import BaseModel
 
 from promptuna.evaluate import RunInfo, RunResults, SuccessfulScoring
 from promptuna.optimize import (
-    Advice,
     OptimizationResult,
     Output,
     Step,
     Thinking,
     default_proposer,
-    render_metrics,
     extract_output_schema,
     extract_program_source,
     optimize,
     render_history,
+    render_metrics,
 )
 
 
@@ -71,6 +70,7 @@ def test_render_history_marks_best_step_and_includes_templates(
 
     assert "⭐ best" in history
     assert "<template>" in history
+    assert "### Template" in history
     assert "better template" in history
     assert "Δ +0.50 vs baseline" in history
 
@@ -94,8 +94,9 @@ def test_render_history_uses_rendered_error_format(experiment, examples, exact_m
     history = render_history([step])
 
     assert "Classify: indexed prompt text" in history
-    assert "<output>\n'wrong'\n</output>" in history
-    assert "Rendered prompt" in history
+    assert "<output>\n'wrong'\n</output>" not in history
+    assert "'wrong'" in history
+    assert "Rendered Prompt:" in history
 
 
 def test_render_history_renders_rendered_prompt_only_for_best_and_last(
@@ -123,7 +124,7 @@ def test_render_history_renders_rendered_prompt_only_for_best_and_last(
     assert "BASELINE_RENDERED" not in history
     assert repr(examples[0].inputs) not in history
     # exactly two error-analysis sections (best + last), none for the baseline.
-    assert history.count("### Error analysis") == 2
+    assert history.count("### Error Analysis") == 2
 
 
 def test_render_metrics_is_empty_without_steps():
@@ -136,7 +137,7 @@ def test_render_metrics_lists_name_and_description(experiment, examples, exact_m
 
     markdown = render_metrics([step])
 
-    assert "### `exact_match`" in markdown
+    assert "## `exact_match`" in markdown
     assert "Output must match the reference answer." in markdown
 
 
@@ -184,39 +185,6 @@ def test_extract_program_source_raises_for_unintrospectable_program(experiment):
 
     with pytest.raises(TypeError):
         extract_program_source([step])
-
-
-def test_default_proposer_returns_template_and_logs_advisories(
-    experiment, examples, exact_match_metric, caplog
-):
-    step = Step(
-        prompt_template="baseline",
-        result=make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.5]),
-    )
-    output = Output(
-        thinking=Thinking(
-            reinstate_goal="",
-            trajectory_summary="",
-            failure_analysis="",
-            what_works="",
-            what_hurts="",
-            improvement_hypothesis="",
-            edit_plan="",
-        ),
-        prompt_template="Improved: {{ question }}",
-        advices=[Advice(target="output_schema", suggestion="add a confidence field")],
-    )
-    response = CompletionResponse(
-        content="", input_tokens=1, output_tokens=1, latency=0.1, parsed=output
-    )
-
-    with patch("promptuna.optimize.complete", return_value=response):
-        with caplog.at_level(logging.INFO, logger="promptuna.optimize"):
-            template = default_proposer([step], experiment.config)
-
-    assert template == "Improved: {{ question }}"
-    assert "add a confidence field" in caplog.text
-    assert "output_schema" in caplog.text
 
 
 def test_optimize_rejects_negative_steps(experiment, examples, exact_match_metric):

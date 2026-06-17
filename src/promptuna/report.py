@@ -46,20 +46,13 @@ def _weakest_examples(result: RunResults, limit: int) -> list[WeakExampleEntry]:
 
 def _render_quality(results: RunResults) -> str:
     """Render the quality section for a single run."""
-    overall = results.overall
-    metric_label = "metric" if overall.n == 1 else "metrics"
-    lines = [
-        "### Quality",
-        "",
-        f"- **Overall**: {overall.mean:.2f} ({overall.n} {metric_label})",
-    ]
+    lines = ["### Quality", ""]
 
     per_metric = results.per_metric()
     if per_metric:
         noise = results.replicate_noise()
         lines.extend(
             [
-                "",
                 "| Metric | Score | Replicate noise |",
                 "| --- | --- | --- |",
             ]
@@ -101,37 +94,43 @@ def _render_weak_example(
     breakdown: list[MetricBreakdown],
     trial: SuccessfulTrial | None,
 ) -> list[str]:
-    """Render one weak example as a ``<weak_example>``-delimited block.
+    """Render one weak example for the error-analysis section.
 
-    The tag delimiter isolates each example from its neighbours and from the
-    surrounding report: a rendered prompt carries its own markup (code fences,
-    headings) that would otherwise bleed out. When ``trial`` is given, the block
-    shows the rendered prompt the LM saw and the program output; otherwise it
-    falls back to the raw dataset inputs. Either way it lists the per-metric
-    scores and judge reasons.
+    When ``trial`` is given, the block shows the rendered prompt the LM saw and
+    the program output; otherwise it falls back to the raw dataset inputs.
+    Either way it lists the per-metric scores and judge reasons.
     """
-    lines = [f"{index}. **mean {mean_score:.2f}**", "<weak_example>"]
+    lines = [f"#### Example {index} - score {mean_score:.2f}", ""]
     if trial is not None:
         lines.extend(
             [
-                "**Rendered prompt** (what the LM saw):",
+                "**Rendered Prompt:**",
+                "",
                 "<rendered_prompt>",
                 trial.rendered_prompt,
                 "</rendered_prompt>",
-                "**Output** (what the program returned):",
-                "<output>",
+                "",
+                "**Output:**",
+                "",
                 repr(trial.output),
-                "</output>",
+                "",
             ]
         )
     else:
-        lines.append(f"**Inputs**: `{example.inputs!r}`")
+        lines.extend(
+            [
+                "**Inputs:**",
+                "",
+                f"`{example.inputs!r}`",
+                "",
+            ]
+        )
+    lines.extend(["**Quality:**", ""])
     for metric_name, normalized, reason in breakdown:
         detail = f"- `{metric_name}`: {normalized:.2f}"
         if reason:
             detail += f" — {reason}"
         lines.append(detail)
-    lines.append("</weak_example>")
     return lines
 
 
@@ -140,7 +139,7 @@ def _render_weak_examples(
 ) -> str:
     """Render error analysis (weakest-example detail) for a single run."""
     weak = _weakest_examples(results, _MAX_WEAK_EXAMPLES)
-    lines = ["### Error analysis", ""]
+    lines = ["### Error Analysis", ""]
     if weak:
         for i, (example, mean_score, breakdown) in enumerate(weak, start=1):
             trial = _trial_for_example(results, example) if error_format == "rendered" else None
