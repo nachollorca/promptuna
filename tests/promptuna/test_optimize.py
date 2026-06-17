@@ -9,7 +9,7 @@ from helpers import make_run_results, make_trial
 from lmdk import CompletionResponse
 from pydantic import BaseModel
 
-from promptuna.evaluate import RunInfo, RunResults
+from promptuna.evaluate import RunInfo, RunResults, SuccessfulScoring
 from promptuna.optimize import (
     Advice,
     OptimizationResult,
@@ -73,6 +73,57 @@ def test_render_history_marks_best_step_and_includes_templates(
     assert "<template>" in history
     assert "better template" in history
     assert "Δ +0.50 vs baseline" in history
+
+
+def test_render_history_uses_rendered_error_format(experiment, examples, exact_match_metric):
+    weak_example = examples[0]
+    trial = make_trial(
+        weak_example,
+        output="wrong",
+        rendered_prompt="Classify: indexed prompt text",
+    )
+    result = make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.4])
+    result.trials[0] = trial
+    result.scorings[0] = SuccessfulScoring(
+        trial=trial,
+        metric=exact_match_metric,
+        score=result.scorings[0].score,
+    )
+    step = Step(prompt_template="baseline template", result=result)
+
+    history = render_history([step])
+
+    assert "Classify: indexed prompt text" in history
+    assert "<output>\n'wrong'\n</output>" in history
+    assert "Rendered prompt" in history
+
+
+def test_render_history_renders_rendered_prompt_only_for_best_and_last(
+    experiment, examples, exact_match_metric
+):
+    def step_with_rendered(template, score, rendered_prompt):
+        trial = make_trial(examples[0], output="wrong", rendered_prompt=rendered_prompt)
+        result = make_run_results(experiment, examples[:1], exact_match_metric, scores=[score])
+        result.trials[0] = trial
+        result.scorings[0] = SuccessfulScoring(
+            trial=trial, metric=exact_match_metric, score=result.scorings[0].score
+        )
+        return Step(prompt_template=template, result=result)
+
+    baseline = step_with_rendered("baseline", 0.4, "BASELINE_RENDERED")
+    best = step_with_rendered("best", 0.9, "BEST_RENDERED")
+    last = step_with_rendered("last", 0.5, "LAST_RENDERED")
+
+    history = render_history([baseline, best, last])
+
+    # best (step 1) and last (step 2) show the rendered prompt; the superseded
+    # baseline omits error analysis entirely (no rendered prompt, no raw inputs).
+    assert "BEST_RENDERED" in history
+    assert "LAST_RENDERED" in history
+    assert "BASELINE_RENDERED" not in history
+    assert repr(examples[0].inputs) not in history
+    # exactly two error-analysis sections (best + last), none for the baseline.
+    assert history.count("### Error analysis") == 2
 
 
 def test_render_metrics_is_empty_without_steps():
