@@ -15,7 +15,7 @@ def test_render_run_includes_quality_reliability_and_error_analysis(
 
     assert "### Quality" in markdown
     assert "### Reliability" in markdown
-    assert "### Error analysis" in markdown
+    assert "### Error Analysis" in markdown
     assert "exact_match" in markdown
     assert "0.25" in markdown
 
@@ -39,7 +39,7 @@ def test_render_run_error_format_inputs_shows_dataset_inputs(experiment, example
     markdown = render_run(results, telemetry=False, error_format="inputs")
 
     assert repr(examples[1].inputs) in markdown
-    assert "Rendered prompt" not in markdown
+    assert "Rendered Prompt:" not in markdown
     assert "**Output**" not in markdown
 
 
@@ -63,12 +63,14 @@ def test_render_run_error_format_rendered_shows_rendered_prompt_and_output(
     markdown = render_run(results, telemetry=False, error_format="rendered")
 
     assert "[0] first sentence" in markdown
-    assert "Rendered prompt" in markdown
-    assert "<output>\n[0, 2]\n</output>" in markdown
+    assert "Rendered Prompt:" in markdown
+    assert "<rendered_prompt>" in markdown
+    assert repr(trial.output) in markdown
+    assert "<output>" not in markdown
     assert repr(weak_example.inputs) not in markdown
 
 
-def test_render_run_wraps_weak_examples_in_delimiters(experiment, examples, exact_match_metric):
+def test_render_run_rendered_prompt_with_fenced_markup_does_not_bleed(experiment, examples, exact_match_metric):
     # A rendered prompt that carries its own fenced markup must not bleed into
     # the report — the tag delimiters isolate it.
     weak_example = examples[1]
@@ -83,12 +85,10 @@ def test_render_run_wraps_weak_examples_in_delimiters(experiment, examples, exac
 
     markdown = render_run(results, telemetry=False, error_format="rendered")
 
-    assert "<weak_example>" in markdown
-    assert "</weak_example>" in markdown
     assert "<rendered_prompt>" in markdown
     assert "</rendered_prompt>" in markdown
-    assert "<output>" in markdown
-    assert "</output>" in markdown
+    assert "#### Example" in markdown
+    assert "**Quality:**" in markdown
 
 
 def test_render_run_error_format_none_omits_error_analysis(experiment, examples, exact_match_metric):
@@ -97,7 +97,7 @@ def test_render_run_error_format_none_omits_error_analysis(experiment, examples,
 
     assert "### Quality" in markdown
     assert "### Reliability" in markdown
-    assert "### Error analysis" not in markdown
+    assert "### Error Analysis" not in markdown
 
 
 def test_render_run_error_format_rendered_falls_back_to_inputs_without_successful_trial(
@@ -117,7 +117,7 @@ def test_render_run_error_format_rendered_falls_back_to_inputs_without_successfu
     markdown = render_run(results, telemetry=False, error_format="rendered")
 
     assert repr(example.inputs) in markdown
-    assert "Rendered prompt" not in markdown
+    assert "Rendered Prompt:" not in markdown
 
 
 def test_render_run_reports_trial_and_scoring_failures(experiment, example, exact_match_metric):

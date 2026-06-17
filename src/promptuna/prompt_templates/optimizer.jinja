@@ -2,9 +2,10 @@ We have a Program: a function that calls a language model to accomplish a task.
 Its output quality is measured by one or more metrics over a fixed dataset.
 Each metric is normalized to [0, 1] and combined into a single headline score (higher is better).
 
-We are searching for a prompt template that maximizes that headline score.
+**We are searching for a prompt template that maximizes that headline score.**
 
-## Program (fixed)
+
+# Program
 
 The **program** is everything that turns inputs into evaluated outputs. It has three parts:
 
@@ -13,28 +14,29 @@ The **program** is everything that turns inputs into evaluated outputs. It has t
 3. **Post-processing** — deterministic handling after the LM returns (parsing, coercion, fallbacks).
 
 We are searching exclusively over the prompt template space.
-The output schema, model, and pre/post-processing are fixed.
-Do not try to change them through the template.
+Consider the output schema, model, and pre/post-processing fixed.
 
 {% if OUTPUT_SCHEMA %}
-### Output schema (fixed)
+## Output schema
 
-The program enforces this structured-output contract on the model. Do not restate constraints it already guarantees (types, enums, required fields); spend the template on *populating* these fields well.
+The program enforces this structured-output contract on the model.
+Do not restate constraints it already guarantees (types, enums, required fields); spend the template on *populating* these fields well.
 
 ```python
 {{ OUTPUT_SCHEMA }}
 ```
 {% endif %}
 
-### Program source (fixed)
+## Program source
 
-The deterministic scaffold around the LM call (pre/post-processing) is **not** editable. Account for it — truncation, parsing, coercion, fallbacks — instead of duplicating or fighting it from the template.
+The deterministic scaffold around the LM call (pre/post-processing) is **not** editable.
+Account for it — truncation, parsing, coercion, fallbacks — instead of duplicating or fighting it from the template.
 
 ```python
 {{ PROGRAM_SOURCE }}
 ```
 
-## Metrics (fixed)
+# Metrics
 
 The headline score is the mean across these metrics (each weighted equally).
 Metrics are not editable — use each description as the rubric for what “good” means.
@@ -43,30 +45,36 @@ Metrics are not editable — use each description as the rubric for what “good
 {{ METRICS }}
 {% endif %}
 
-## Trajectory
+# Trajectory
 
-### How to read these results
+The headline score is the mean across per-metric means (each metric weighted equally).
 
-Headline score is the mean across per-metric means (each metric weighted equally).
-
-Each quality table cell is `mean ± sd (n)`. `Score` aggregates per-example means (dispersion = dataset heterogeneity); `Replicate noise` is the average within-cell SD across replicates (dispersion = measurement instability).
+Each quality table cell is `mean ± sd (n)`.
+`Score` aggregates per-example means (dispersion = dataset heterogeneity).
+`Replicate noise` is the average within-cell SD across replicates (dispersion = measurement instability).
 
 Trial failures count against the run (the program is under evaluation); scorer failures are excluded from quality aggregates.
 
 Each `## Step N` heading shows role (baseline or candidate), headline score, delta vs baseline (candidates only), and `⭐ best` on the winning step so far.
 
-Each step opens with the verbatim template in a `template` block, then the quality and reliability results it produced. Error analysis appears only for the best (⭐) and latest checkpoints — the ones worth acting on — since superseded steps are already summarised by their score and template. When present, it surfaces the weakest examples, each wrapped in a `weak_example` block with the rendered prompt the LM saw (in a `rendered_prompt` block), the program output (in an `output` block), and its per-metric scores and judge reasons.
+Each step opens with the verbatim template in a `template` block, then the quality and reliability results it produced.
+
+Error analysis appears only for the best (⭐) and latest checkpoints.
+When present, it surfaces the weakest examples, with the rendered prompt the LM saw (in a `rendered_prompt` block), the program output, and its per-metric scores.
 
 {{ HISTORY }}
 
-## Goal
+# Goal
 
 Study the trajectory: infer what changes helped, what hurt, and where the current best prompt still fails.
+Metric descriptions state the rubric; scores and judge reasons on prior steps reveal what the template still leaves implicit.
+Infer that missing rubric and encode it in the new template so the model is steered toward higher scores.
 Then write an improved prompt template.
 You may refine the best checkpoint or explore a completely different approach.
 
-If the real bottleneck lies outside the template, record it as an advice for human review instead of forcing it into the template.
+If the real bottleneck lies outside the template, you can record it additionally as an advice for human review.
 This can be a schema field that needs a clearer description, lossy pre/post-processing, an output contract that cannot express the task, a model that is too bad...
+You should still try to explore different options in any case.
 
 Keep every Jinja placeholder (enclosed in double curly braces) from the templates above exactly as-is (same names and syntax).
 Removing or renaming them breaks rendering and makes the template unusable.
