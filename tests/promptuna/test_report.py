@@ -64,8 +64,40 @@ def test_render_run_error_format_rendered_shows_rendered_prompt_and_output(
 
     assert "[0] first sentence" in markdown
     assert "Rendered prompt" in markdown
-    assert "**Output**: `[0, 2]`" in markdown
+    assert "<output>\n[0, 2]\n</output>" in markdown
     assert repr(weak_example.inputs) not in markdown
+
+
+def test_render_run_wraps_weak_examples_in_delimiters(experiment, examples, exact_match_metric):
+    # A rendered prompt that carries its own fenced markup must not bleed into
+    # the report — the tag delimiters isolate it.
+    weak_example = examples[1]
+    trial = make_trial(weak_example, output=[0, 2], rendered_prompt="```\nfenced body\n```")
+    results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
+    results.trials[1] = trial
+    results.scorings[1] = SuccessfulScoring(
+        trial=trial,
+        metric=exact_match_metric,
+        score=results.scorings[1].score,
+    )
+
+    markdown = render_run(results, telemetry=False, error_format="rendered")
+
+    assert "<weak_example>" in markdown
+    assert "</weak_example>" in markdown
+    assert "<rendered_prompt>" in markdown
+    assert "</rendered_prompt>" in markdown
+    assert "<output>" in markdown
+    assert "</output>" in markdown
+
+
+def test_render_run_error_format_none_omits_error_analysis(experiment, examples, exact_match_metric):
+    results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
+    markdown = render_run(results, telemetry=False, error_format=None)
+
+    assert "### Quality" in markdown
+    assert "### Reliability" in markdown
+    assert "### Error analysis" not in markdown
 
 
 def test_render_run_error_format_rendered_falls_back_to_inputs_without_successful_trial(

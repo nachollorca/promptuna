@@ -94,8 +94,36 @@ def test_render_history_uses_rendered_error_format(experiment, examples, exact_m
     history = render_history([step])
 
     assert "Classify: indexed prompt text" in history
-    assert "**Output**: `'wrong'`" in history
+    assert "<output>\n'wrong'\n</output>" in history
     assert "Rendered prompt" in history
+
+
+def test_render_history_renders_rendered_prompt_only_for_best_and_last(
+    experiment, examples, exact_match_metric
+):
+    def step_with_rendered(template, score, rendered_prompt):
+        trial = make_trial(examples[0], output="wrong", rendered_prompt=rendered_prompt)
+        result = make_run_results(experiment, examples[:1], exact_match_metric, scores=[score])
+        result.trials[0] = trial
+        result.scorings[0] = SuccessfulScoring(
+            trial=trial, metric=exact_match_metric, score=result.scorings[0].score
+        )
+        return Step(prompt_template=template, result=result)
+
+    baseline = step_with_rendered("baseline", 0.4, "BASELINE_RENDERED")
+    best = step_with_rendered("best", 0.9, "BEST_RENDERED")
+    last = step_with_rendered("last", 0.5, "LAST_RENDERED")
+
+    history = render_history([baseline, best, last])
+
+    # best (step 1) and last (step 2) show the rendered prompt; the superseded
+    # baseline omits error analysis entirely (no rendered prompt, no raw inputs).
+    assert "BEST_RENDERED" in history
+    assert "LAST_RENDERED" in history
+    assert "BASELINE_RENDERED" not in history
+    assert repr(examples[0].inputs) not in history
+    # exactly two error-analysis sections (best + last), none for the baseline.
+    assert history.count("### Error analysis") == 2
 
 
 def test_render_metrics_is_empty_without_steps():
