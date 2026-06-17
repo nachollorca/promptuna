@@ -304,7 +304,7 @@ def render_history(steps: list[Step]) -> str:
         sections = [
             _render_step_heading(step, i, baseline_score, is_best=i == best_index),
             f"<template>\n{step.prompt_template}\n</template>",
-            render_run(step.result, telemetry=False, weak_context="trial"),
+            render_run(step.result, telemetry=False, error_format="rendered"),
         ]
         step_blocks.append("\n\n".join(sections))
 

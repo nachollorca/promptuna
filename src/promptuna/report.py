@@ -7,7 +7,6 @@ from promptuna.run import SuccessfulTrial
 
 _MAX_WEAK_EXAMPLES = 3
 
-WeakContext = Literal["inputs", "trial"]
 MetricBreakdown = tuple[str, float, str]
 WeakExampleEntry = tuple[Example, float, list[MetricBreakdown]]
 
@@ -95,13 +94,15 @@ def _trial_for_example(results: RunResults, example: Example) -> SuccessfulTrial
     return None
 
 
-def _render_weak_examples(results: RunResults, *, weak_context: WeakContext = "inputs") -> str:
-    """Render weakest-example detail for a single run."""
+def _render_weak_examples(
+    results: RunResults, *, error_format: Literal["inputs", "rendered"] = "inputs"
+) -> str:
+    """Render error analysis (weakest-example detail) for a single run."""
     weak = _weakest_examples(results, _MAX_WEAK_EXAMPLES)
-    lines = ["### Weak examples", ""]
+    lines = ["### Error analysis", ""]
     if weak:
         for i, (example, mean_score, breakdown) in enumerate(weak, start=1):
-            if weak_context == "inputs":
+            if error_format == "inputs":
                 lines.append(f"{i}. **mean {mean_score:.2f}** — `{example.inputs!r}`")
             else:
                 trial = _trial_for_example(results, example)
@@ -146,20 +147,24 @@ def _render_telemetry(results: RunResults) -> str:
 
 
 def render_run(
-    results: RunResults, *, telemetry: bool = True, weak_context: WeakContext = "inputs"
+    results: RunResults,
+    *,
+    telemetry: bool = True,
+    error_format: Literal["inputs", "rendered"] = "inputs",
 ) -> str:
     """Render a single run as markdown sections.
 
     Args:
         results: The run to render.
         telemetry: Omit the telemetry section when ``False``.
-        weak_context: How to show weak examples — raw ``Example.inputs`` (``"inputs"``)
-            or the rendered prompt and program output from a trial (``"trial"``).
+        error_format: How the error-analysis section shows each weak example — raw
+            ``Example.inputs`` (``"inputs"``) or the rendered prompt and program
+            output from its trial (``"rendered"``).
     """
     sections: list[str] = [
         _render_quality(results),
         _render_reliability(results),
-        _render_weak_examples(results, weak_context=weak_context),
+        _render_weak_examples(results, error_format=error_format),
     ]
     if telemetry:
         sections.append(_render_telemetry(results))

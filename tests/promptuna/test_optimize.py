@@ -75,7 +75,7 @@ def test_render_history_marks_best_step_and_includes_templates(
     assert "Δ +0.50 vs baseline" in history
 
 
-def test_render_history_uses_trial_weak_context(experiment, examples, exact_match_metric):
+def test_render_history_uses_rendered_error_format(experiment, examples, exact_match_metric):
     weak_example = examples[0]
     trial = make_trial(
         weak_example,

@@ -7,7 +7,7 @@ from promptuna.run import FailedTrial
 from helpers import make_run_results, make_trial
 
 
-def test_render_run_includes_quality_reliability_and_weak_examples(
+def test_render_run_includes_quality_reliability_and_error_analysis(
     experiment, examples, exact_match_metric
 ):
     results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
@@ -15,7 +15,7 @@ def test_render_run_includes_quality_reliability_and_weak_examples(
 
     assert "### Quality" in markdown
     assert "### Reliability" in markdown
-    assert "### Weak examples" in markdown
+    assert "### Error analysis" in markdown
     assert "exact_match" in markdown
     assert "0.25" in markdown
 
@@ -34,16 +34,16 @@ def test_render_run_reports_all_perfect_when_no_weak_examples(experiment, exampl
     assert "All examples scored perfectly." in markdown
 
 
-def test_render_run_weak_context_inputs_shows_dataset_inputs(experiment, examples, exact_match_metric):
+def test_render_run_error_format_inputs_shows_dataset_inputs(experiment, examples, exact_match_metric):
     results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
-    markdown = render_run(results, telemetry=False, weak_context="inputs")
+    markdown = render_run(results, telemetry=False, error_format="inputs")
 
     assert repr(examples[1].inputs) in markdown
     assert "Rendered prompt" not in markdown
     assert "**Output**" not in markdown
 
 
-def test_render_run_weak_context_trial_shows_rendered_prompt_and_output(
+def test_render_run_error_format_rendered_shows_rendered_prompt_and_output(
     experiment, examples, exact_match_metric
 ):
     weak_example = examples[1]
@@ -60,7 +60,7 @@ def test_render_run_weak_context_trial_shows_rendered_prompt_and_output(
         score=results.scorings[1].score,
     )
 
-    markdown = render_run(results, telemetry=False, weak_context="trial")
+    markdown = render_run(results, telemetry=False, error_format="rendered")
 
     assert "[0] first sentence" in markdown
     assert "Rendered prompt" in markdown
@@ -68,7 +68,7 @@ def test_render_run_weak_context_trial_shows_rendered_prompt_and_output(
     assert repr(weak_example.inputs) not in markdown
 
 
-def test_render_run_weak_context_trial_falls_back_to_inputs_without_successful_trial(
+def test_render_run_error_format_rendered_falls_back_to_inputs_without_successful_trial(
     experiment, example, exact_match_metric
 ):
     failed_trial = FailedTrial(example=example, error=RuntimeError("boom"))
@@ -82,7 +82,7 @@ def test_render_run_weak_context_trial_falls_back_to_inputs_without_successful_t
         )
     ]
 
-    markdown = render_run(results, telemetry=False, weak_context="trial")
+    markdown = render_run(results, telemetry=False, error_format="rendered")
 
     assert repr(example.inputs) in markdown
     assert "Rendered prompt" not in markdown
