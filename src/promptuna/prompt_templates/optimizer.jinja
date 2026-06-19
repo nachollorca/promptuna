@@ -18,11 +18,12 @@ Consider the output schema, model, and pre/post-processing fixed.
 {% if OUTPUT_SCHEMA %}
 ## Output schema
 
-The program enforces this structured-output contract on the model.
+The program passes a Pydantic ``BaseModel`` (possibly nested) to ``complete(..., output_schema=...)``.
+The JSON Schema below describes that model — the structured-output contract enforced on the model.
 Do not restate constraints it already guarantees (types, enums, required fields);
 spend the template on *populating* these fields well.
 
-```python
+```json
 {{ OUTPUT_SCHEMA }}
 ```
 {% endif %}
