@@ -15,13 +15,10 @@ Walk through a small but realistic example:
 """
 
 import os
-import re
-from typing import Literal
 
 import logfire
-from lmdk import complete, render_template
-from pydantic import BaseModel, Field
 
+from getting_started_program import classify_sentiment
 from promptuna.evaluate import (
     LLMJudgeMetric,
     Ordinal,
@@ -93,39 +90,8 @@ examples = [
 # The function must adhere to the Program protocol: take its named inputs, the prompt template,
 # and an LM config, then return whatever the downstream scorers should consume. The harness unpacks
 # Example.inputs as keyword arguments, so the parameter names must match the dict keys.
-
-ALLOWED_LABELS = {"positive", "neutral", "negative"}
-MAX_REVIEW_CHARS = 500
-
-
-def classify_sentiment(review: str, prompt_template: str, config: LMConfig) -> dict:
-    # Scaffold (pre): normalise whitespace and cap length
-    cleaned = re.sub(r"\s+", " ", review).strip()
-    if len(cleaned) > MAX_REVIEW_CHARS:
-        cleaned = cleaned[:MAX_REVIEW_CHARS] + "…"
-
-    # Define the output schema expected from the model
-    class Output(BaseModel):
-        sentiment: Literal["positive", "neutral", "negative"]
-        reason: str = Field(description="One short sentence justifying the sentiment label.")
-
-    # Call the model with lmdk.complete
-    prompt = render_template(template=prompt_template, REVIEW=cleaned)
-    response = complete(
-        model=config.model,
-        generation_kwargs=config.generation_kwargs,
-        prompt=prompt,
-        output_schema=Output,
-    )
-
-    # Scaffold (post): normalize the label and fall back to "neutral"
-    label = (response.output.sentiment or "").strip().lower()
-    if label not in ALLOWED_LABELS:
-        label = "neutral"
-
-    # Return arbitrary format that will be downstream consumed
-    return {"sentiment": label, "reason": response.output.reason.strip()}
-
+# The program and its output schema live in getting_started_program.py so the optimizer
+# can introspect them (see that module's docstring).
 
 # ## Knobs
 # Now, lets define the moving parts under test. The two sweepable axes are the prompt template

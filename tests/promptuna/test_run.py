@@ -1,6 +1,5 @@
 """Tests for promptuna.run."""
 
-from promptuna.program import Example, LMConfig
 from promptuna.run import FailedTrial, SuccessfulTrial, run_trial
 
 

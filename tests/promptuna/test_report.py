@@ -1,10 +1,10 @@
 """Tests for promptuna.report."""
 
+from helpers import make_run_results, make_trial
+
 from promptuna.evaluate import FailedScoring, Score, SuccessfulScoring
-from promptuna.program import Example
 from promptuna.report import render_run
 from promptuna.run import FailedTrial
-from helpers import make_run_results, make_trial
 
 
 def test_render_run_includes_quality_reliability_and_error_analysis(
