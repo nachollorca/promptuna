@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.14.1 (2026-06-19)
+
+### Bug Fixes
+
+- **optimizer**: Make template clearer
+  ([`adc38df`](https://github.com/nachollorca/promptuna/commit/adc38df417cd4be90750517953f8c685872880dc))
+
+
 ## v1.14.0 (2026-06-17)
 
 ### Features
