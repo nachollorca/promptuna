@@ -58,12 +58,22 @@ Trial failures count against the run (the program is under evaluation); scorer f
 
 Each `## Step N` heading shows role (baseline or candidate), headline score, delta vs baseline, and `⭐ best` on the winning step so far.
 
-Each step opens with the verbatim template in a `template` fenced block, then the quality and reliability results it produced.
+Each proposed step (not the baseline) opens with an **Intent** block — the hypothesis and edit plan that motivated the template change — then the verbatim template in a `template` fenced block, then the quality and reliability results it produced.
 
 Error analysis appears only for the best (⭐) and latest checkpoints.
 When present, it surfaces the weakest examples, with the rendered prompt the LM saw (in a `rendered_prompt` fenced block), the program output, and its per-metric scores.
 
 {{ HISTORY }}
+
+{% if PRIOR_RATIONALE %}
+# Prior proposal rationale
+
+This section contains the structured analysis produced **before** the latest checkpoint was evaluated.
+It accounts for the thinking process accounting for the whole trajectory up to this point.
+Use it to calibrate intent vs outcome; do not treat it as instructions you must follow.
+
+{{ PRIOR_RATIONALE }}
+{% endif %}
 
 # Goal
 

@@ -33,39 +33,6 @@ default_proposer_template = (
 ).read_text()
 
 
-@dataclass(frozen=True)
-class Step:
-    """One search checkpoint: a candidate template and how it scored."""
-
-    prompt_template: str
-    result: RunResults
-
-    @property
-    def score(self) -> float:
-        """The headline objective for this step (``RunResults.overall.mean``)."""
-        return self.result.overall.mean
-
-
-@dataclass
-class OptimizationResult:
-    """Archive from :func:`optimize`; ``steps[0]`` is the baseline."""
-
-    steps: list[Step]
-
-    @property
-    def best(self) -> Step:
-        """The highest-scoring step (ties resolve to the earliest)."""
-        return max(self.steps, key=lambda step: step.score)
-
-
-class Proposer(Protocol):
-    """Generates the next candidate template from the trajectory so far."""
-
-    def __call__(  # noqa: D102
-        self, steps: list[Step], model: str
-    ) -> str: ...
-
-
 class Thinking(BaseModel):
     """Structured reasoning forced upon the optimizer before proposing a new template.
 
@@ -132,6 +99,48 @@ class Output(BaseModel):
     )
 
 
+@dataclass(frozen=True)
+class Step:
+    """One search checkpoint: a candidate template and how it scored."""
+
+    prompt_template: str
+    result: RunResults
+    thinking: Thinking | None = None
+
+    @property
+    def score(self) -> float:
+        """The headline objective for this step (``RunResults.overall.mean``)."""
+        return self.result.overall.mean
+
+
+@dataclass(frozen=True)
+class Proposal:
+    """Structured reasoning and the candidate template it produced."""
+
+    thinking: Thinking | None
+    prompt_template: str
+
+
+@dataclass
+class OptimizationResult:
+    """Archive from :func:`optimize`; ``steps[0]`` is the baseline."""
+
+    steps: list[Step]
+
+    @property
+    def best(self) -> Step:
+        """The highest-scoring step (ties resolve to the earliest)."""
+        return max(self.steps, key=lambda step: step.score)
+
+
+class Proposer(Protocol):
+    """Generates the next candidate template from the trajectory so far."""
+
+    def __call__(  # noqa: D102
+        self, steps: list[Step], model: str
+    ) -> Proposal: ...
+
+
 _PROGRAM_SOURCE_ERROR = (
     "Cannot introspect program source. Define the program in a .py module and import it — "
     "functions defined in notebook cells (or wrapped with functools.partial) cannot be "
@@ -175,17 +184,17 @@ def render_metrics(steps: list[Step]) -> str:
 
 def default_proposer(
     steps: list[Step], model: str, template: str = default_proposer_template
-) -> str:
+) -> Proposal:
     """Propose a new template from the trajectory via structured output.
 
     Args:
         steps: Chronological archive from :func:`optimize`.
         model: Proposer model id.
         template: Jinja template; expects ``HISTORY``, ``METRICS``, ``OUTPUT_SCHEMA``,
-            and ``PROGRAM_SOURCE`` variables.
+            ``PROGRAM_SOURCE``, and optionally ``PRIOR_RATIONALE``.
 
     Returns:
-        Proposed prompt template.
+        Structured reasoning and the proposed prompt template.
     """
     prompt = render_template(
         template=template,
@@ -193,6 +202,7 @@ def default_proposer(
         METRICS=render_metrics(steps),
         OUTPUT_SCHEMA=extract_output_schema(steps),
         PROGRAM_SOURCE=extract_program_source(steps),
+        PRIOR_RATIONALE=render_prior_rationale(steps),
         strip_curly_brackets=False,
     )
     response = complete(
@@ -202,7 +212,7 @@ def default_proposer(
     )
     parsed = response.parsed
     assert parsed is not None, "proposer model returned no structured output"
-    return parsed.prompt_template
+    return Proposal(thinking=parsed.thinking, prompt_template=parsed.prompt_template)
 
 
 def optimize(
@@ -243,12 +253,18 @@ def optimize(
     for _ in range(steps):
         if archive[-1].score >= 1.0:
             break
-        candidate = proposer(steps=archive, model=proposer_model)
-        candidate_experiment = replace(experiment, prompt_template=candidate)
+        proposal = proposer(steps=archive, model=proposer_model)
+        candidate_experiment = replace(experiment, prompt_template=proposal.prompt_template)
         result = run_experiment(
             experiment=candidate_experiment, examples=examples, metrics=metrics, workers=workers
         )
-        archive.append(Step(prompt_template=candidate, result=result))
+        archive.append(
+            Step(
+                prompt_template=proposal.prompt_template,
+                result=result,
+                thinking=proposal.thinking,
+            )
+        )
 
     return OptimizationResult(steps=archive)
 
@@ -267,6 +283,46 @@ def _render_step_heading(step: Step, index: int, baseline_score: float, is_best:
     if is_best:
         parts.append("⭐ best")
     return " · ".join(parts)
+
+
+def _render_step_intent(thinking: Thinking) -> str:
+    """Compact rationale for a proposed step (hypothesis + edit plan)."""
+    return "\n\n".join(
+        [
+            "### Intent",
+            "",
+            f"**Hypothesis:** {thinking.improvement_hypothesis}",
+            "",
+            f"**Edit plan:** {thinking.edit_plan}",
+        ]
+    )
+
+
+def _render_full_thinking(thinking: Thinking) -> str:
+    """Render every field from a structured reasoning block."""
+    labels = {
+        "reinstate_goal": "Reinstate goal",
+        "trajectory_summary": "Trajectory summary",
+        "failure_analysis": "Failure analysis",
+        "what_works": "What works",
+        "what_hurts": "What hurts",
+        "improvement_hypothesis": "Improvement hypothesis",
+        "edit_plan": "Edit plan",
+    }
+    sections: list[str] = []
+    for field, label in labels.items():
+        sections.extend([f"**{label}:**", "", getattr(thinking, field), ""])
+    return "\n".join(sections).rstrip()
+
+
+def render_prior_rationale(steps: list[Step]) -> str:
+    """Full analysis from the latest proposal, for post-history proposer context."""
+    if len(steps) < 2:
+        return ""
+    thinking = steps[-1].thinking
+    if thinking is None:
+        return ""
+    return _render_full_thinking(thinking)
 
 
 def render_history(steps: list[Step]) -> str:
@@ -290,13 +346,17 @@ def render_history(steps: list[Step]) -> str:
     step_blocks: list[str] = []
     for i, step in enumerate(steps):
         error_format = "rendered" if i in detailed else None
-        sections = [
-            _render_step_heading(step, i, baseline_score, is_best=i == best_index),
-            "### Template",
-            "",
-            fence_verbatim("template", step.prompt_template),
-            render_run(step.result, telemetry=False, error_format=error_format),
-        ]
+        sections = [_render_step_heading(step, i, baseline_score, is_best=i == best_index)]
+        if i > 0 and step.thinking is not None:
+            sections.append(_render_step_intent(step.thinking))
+        sections.extend(
+            [
+                "### Template",
+                "",
+                fence_verbatim("template", step.prompt_template),
+                render_run(step.result, telemetry=False, error_format=error_format),
+            ]
+        )
         step_blocks.append("\n\n".join(sections))
 
     return "\n\n---\n\n".join(step_blocks)
