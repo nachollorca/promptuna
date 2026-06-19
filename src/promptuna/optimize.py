@@ -125,7 +125,7 @@ class Output(BaseModel):
     advice: str | None = Field(
         default=None,
         description=(
-            "Recommendations outside the editable template (schema, pre/post-processing), if any. "
+            "Recommendations outside the editable template (schema, scaffold), if any. "
             "Use only when the trajectory is not improving by just touching the template."
         ),
     )
