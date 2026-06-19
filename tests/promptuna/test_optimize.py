@@ -65,7 +65,7 @@ def test_render_history_marks_best_step_and_includes_templates(
     history = render_history([baseline, candidate])
 
     assert "⭐ best" in history
-    assert "<template>" in history
+    assert "````template" in history
     assert "### Template" in history
     assert "better template" in history
     assert "Δ +0.50 vs baseline" in history
