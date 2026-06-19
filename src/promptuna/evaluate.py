@@ -24,7 +24,7 @@ from typing import Any, Literal, Protocol
 from lmdk import CompletionResponse, complete, render_template
 from pydantic import BaseModel, ConfigDict, create_model
 
-from promptuna.program import Example, Experiment, LMConfig
+from promptuna.program import Example, Experiment
 from promptuna.run import FailedTrial, SuccessfulTrial, Trial, run_trial
 
 # ---------------------------------------------------------------------------
@@ -125,8 +125,8 @@ class LLMJudgeScorer(Protocol):
 
     Receives the rendered program prompt so the judge can reason about both
     the question and the model's answer. The judge's own prompt template
-    lives on ``LLMJudgeMetric.prompt_template``; the judge's model and gen kwargs
-    live on ``config``.
+    lives on ``LLMJudgeMetric.prompt_template``; the judge model lives on
+    ``metric.model``.
     """
 
     def __call__(  # noqa: D102
@@ -134,8 +134,9 @@ class LLMJudgeScorer(Protocol):
         output: Any,
         example: Example,
         metric: "LLMJudgeMetric",
-        config: LMConfig,
+        model: str,
         rendered_prompt: str,
+        generation_kwargs: dict[str, Any] | None = None,
     ) -> RawScore: ...
 
 
@@ -165,7 +166,7 @@ class LLMJudgeMetric:
     description: str
     scale: Scale
     scorer: LLMJudgeScorer
-    config: LMConfig
+    model: str
     prompt_template: str = default_judge_template
     repeats: int = 1
 
@@ -436,8 +437,9 @@ def default_llm_judge(
     output: Any,
     example: Example,
     metric: LLMJudgeMetric,
-    config: LMConfig,
+    model: str,
     rendered_prompt: str,
+    generation_kwargs: dict[str, Any] | None = None,
 ) -> RawScore:
     """Render the judge template, call the model, return a ``RawScore``.
 
@@ -462,10 +464,10 @@ def default_llm_judge(
         METRIC=metric.description,
     )
     response = complete(
-        model=config.model,
+        model=model,
         prompt=prompt,
         output_schema=schema,
-        generation_kwargs=config.generation_kwargs,
+        generation_kwargs=generation_kwargs,
     )
     parsed = response.parsed
     assert parsed is not None, "judge model returned no structured output"
@@ -549,7 +551,7 @@ def _submit_trials(
             run_trial,
             experiment.program,
             experiment.prompt_template,
-            experiment.config,
+            experiment.model,
             ex,
             replicate=r,
         ): ex
@@ -603,7 +605,7 @@ def score_metric(trial: Trial, metric: Metric, replicate: int = 0) -> Scoring:
                 trial.output,
                 trial.example,
                 metric,
-                metric.config,
+                metric.model,
                 trial.rendered_prompt,
             )
         metric.scale.validate(raw_score.raw)
@@ -654,8 +656,8 @@ def _validate_metrics(metrics: list[Metric]) -> None:
 
     for m in metrics:
         if isinstance(m, LLMJudgeMetric):
-            if not m.config.model:
-                raise ValueError(f"metric {m.name!r}: config.model is empty")
+            if not m.model:
+                raise ValueError(f"metric {m.name!r}: model is empty")
             if not m.prompt_template:
                 raise ValueError(f"metric {m.name!r}: prompt_template is empty")
             if m.repeats < 1:
@@ -665,8 +667,7 @@ def _validate_metrics(metrics: list[Metric]) -> None:
 def _validate_experiment(experiment: Experiment) -> None:
     if not experiment.prompt_template:
         raise ValueError("experiment.prompt_template is empty")
-    cfg = experiment.config
-    if not cfg.model:
-        raise ValueError("experiment.config.model is empty")
+    if not experiment.model:
+        raise ValueError("experiment.model is empty")
     if experiment.repeats < 1:
         raise ValueError(f"experiment.repeats must be >= 1, got {experiment.repeats}")

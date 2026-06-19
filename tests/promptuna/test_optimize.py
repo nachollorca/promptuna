@@ -178,7 +178,7 @@ def test_extract_program_source_raises_for_unintrospectable_program(experiment):
     experiment_no_source = type(experiment)(
         program=partial(echo_program),
         prompt_template=experiment.prompt_template,
-        config=experiment.config,
+        model=experiment.model,
     )
     results = RunResults(experiment=experiment_no_source, run=RunInfo(), trials=[], scorings=[])
     step = Step(prompt_template="t", result=results)
@@ -193,7 +193,7 @@ def test_optimize_rejects_negative_steps(experiment, examples, exact_match_metri
             experiment=experiment,
             examples=examples,
             metrics=[exact_match_metric],
-            proposer_config=experiment.config,
+            proposer_model=experiment.model,
             steps=-1,
         )
 
@@ -201,7 +201,7 @@ def test_optimize_rejects_negative_steps(experiment, examples, exact_match_metri
 def test_optimize_runs_baseline_and_one_proposed_step(
     experiment, examples, exact_match_metric, fake_complete_factory
 ):
-    def proposer(steps, config):
+    def proposer(steps, model):
         return "Improved: {{ question }}"
 
     with fake_complete_factory("wrong"):
@@ -209,7 +209,7 @@ def test_optimize_runs_baseline_and_one_proposed_step(
             experiment=experiment,
             examples=examples[:1],
             metrics=[exact_match_metric],
-            proposer_config=experiment.config,
+            proposer_model=experiment.model,
             steps=1,
             proposer=proposer,
             workers=1,
@@ -225,7 +225,7 @@ def test_optimize_stops_early_when_score_is_perfect(
 ):
     calls = {"n": 0}
 
-    def proposer(steps, config):
+    def proposer(steps, model):
         calls["n"] += 1
         return "should not be evaluated"
 
@@ -236,7 +236,7 @@ def test_optimize_stops_early_when_score_is_perfect(
             experiment=experiment,
             examples=examples[:1],
             metrics=[exact_match_metric],
-            proposer_config=experiment.config,
+            proposer_model=experiment.model,
             steps=3,
             proposer=proposer,
         )

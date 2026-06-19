@@ -4,12 +4,13 @@
 :class:`FailedTrial` so callers can treat crashed programs as data.
 """
 
+import inspect
 from dataclasses import dataclass
 from typing import Any
 
 from lmdk import CompletionRequest, CompletionResponse, observe
 
-from promptuna.program import Example, LMConfig, Program
+from promptuna.program import Example, Program
 
 
 @dataclass(frozen=True)
@@ -49,12 +50,30 @@ Trial = SuccessfulTrial | FailedTrial
 """One program run against one example (tagged union)."""
 
 
+def _invoke_program(
+    program: Program,
+    *,
+    prompt_template: str,
+    model: str,
+    generation_kwargs: dict[str, Any] | None,
+    inputs: dict[str, Any],
+) -> Any:
+    """Call ``program``, injecting only harness params it accepts."""
+    kwargs: dict[str, Any] = {"prompt_template": prompt_template, "model": model, **inputs}
+    sig = inspect.signature(program)
+    accepts_var_kw = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+    if "generation_kwargs" in sig.parameters or accepts_var_kw:
+        kwargs["generation_kwargs"] = generation_kwargs
+    return program(**kwargs)
+
+
 def run_trial(
     program: Program,
     prompt_template: str,
-    config: LMConfig,
+    model: str,
     example: Example,
     replicate: int = 0,
+    generation_kwargs: dict[str, Any] | None = None,
 ) -> Trial:
     """Execute ``program`` against one ``example``.
 
@@ -62,7 +81,13 @@ def run_trial(
     """
     try:
         with observe() as obs:
-            output = program(prompt_template=prompt_template, config=config, **example.inputs)
+            output = _invoke_program(
+                program,
+                prompt_template=prompt_template,
+                model=model,
+                generation_kwargs=generation_kwargs,
+                inputs=example.inputs,
+            )
 
         assert len(obs.records) == 1, "The program must call `complete` exactly one time"
         last = obs.records[-1] if obs.records else None
