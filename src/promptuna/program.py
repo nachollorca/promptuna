@@ -24,11 +24,16 @@ class Example:
 class Program(Protocol):
     """The shape every function under evaluation must follow.
 
-    A program is a function that achieves a goal using **exactly one** LM
-    completion. It may run arbitrary deterministic code before the call to
-    prepare the prompt (e.g. format inputs, render the template) and after
-    the call to refine the model's response (e.g. parse, validate, repair).
-    Chains of multiple LM calls are out of scope.
+    A **program** is an ordinary Python function that solves a task with
+    **exactly one** LM completion. Around that call sits a deterministic
+    **scaffold**: code that prepares inputs and renders the template before
+    the call, and code that parses, validates, or repairs the model output
+    after. Chains of multiple LM calls are out of scope.
+
+    The harness evaluates the whole function — scaffold, completion, and
+    return value — not the raw model response. During optimization, only the
+    prompt template is editable; the scaffold, output schema, and model stay
+    fixed.
 
     The harness passes ``prompt_template`` and ``model`` on every call.
     Programs may optionally accept ``generation_kwargs`` to forward sampling

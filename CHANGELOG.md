@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.15.0 (2026-06-19)
+
+### Documentation
+
+- Unify the definition of Program
+  ([`c9771f9`](https://github.com/nachollorca/promptuna/commit/c9771f945be799ba8cf3367be4fc7fd5006223f2))
+
+### Features
+
+- **optimizer**: Use fenced blocks for verbatim templates in history
+  ([`6695e2d`](https://github.com/nachollorca/promptuna/commit/6695e2df5b032a295e4585dc4d84ff7c5adc4dcf))
+
+
+## v1.14.1 (2026-06-19)
+
+### Bug Fixes
+
+- **optimizer**: Make template clearer
+  ([`adc38df`](https://github.com/nachollorca/promptuna/commit/adc38df417cd4be90750517953f8c685872880dc))
+
+
 ## v1.14.0 (2026-06-17)
 
 ### Features

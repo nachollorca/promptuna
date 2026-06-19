@@ -6,31 +6,31 @@ Each metric is normalized to [0, 1] and combined into a single headline score (h
 
 # Program
 
-The **program** is everything that turns inputs into evaluated outputs. It has three parts:
+The **program** is everything that turns inputs into evaluated outputs. It has two parts:
 
-1. **Pre-processing** — deterministic setup before the LM call (argument shaping, truncation, etc.).
-2. **Completion** — the **prompt template** (the only part you may edit) plus the **output schema** (fixed structured-output contract, when present).
-3. **Post-processing** — deterministic handling after the LM returns (parsing, coercion, fallbacks, etc.).
+1. **Scaffold** — deterministic code before and after the LM call (argument shaping, truncation, template rendering, parsing, coercion, fallbacks, etc.). Not editable.
+2. **Completion** — the single LM call: **prompt template** (the only part you may edit), **output schema** (fixed structured-output contract, when present), and model.
 
 We are searching exclusively over the prompt template space.
-Consider the output schema, model, and pre/post-processing fixed.
+Consider the scaffold, output schema, and model fixed.
 
 {% if OUTPUT_SCHEMA %}
 ## Output schema
 
-The program enforces this structured-output contract on the model.
+The program passes a Pydantic ``BaseModel`` (possibly nested) to ``complete(..., output_schema=...)``.
+The JSON Schema below describes that model — the structured-output contract enforced on the model.
 Do not restate constraints it already guarantees (types, enums, required fields);
 spend the template on *populating* these fields well.
 
-```python
+```json
 {{ OUTPUT_SCHEMA }}
 ```
 {% endif %}
 
-## Program source
+## Program implementation (read-only)
 
-This is the deterministic scaffold around the LM call (pre/post-processing).
-Account for it — truncation, parsing, coercion, fallbacks — instead of duplicating or fighting it from the template.
+Full Python source of the program under evaluation: scaffold, completion call, and output schema.
+Account for the scaffold — truncation, parsing, coercion, fallbacks — instead of duplicating or fighting it from the template.
 
 ```python
 {{ PROGRAM_SOURCE }}
@@ -58,10 +58,10 @@ Trial failures count against the run (the program is under evaluation); scorer f
 
 Each `## Step N` heading shows role (baseline or candidate), headline score, delta vs baseline, and `⭐ best` on the winning step so far.
 
-Each step opens with the verbatim template in a `template` block, then the quality and reliability results it produced.
+Each step opens with the verbatim template in a `template` fenced block, then the quality and reliability results it produced.
 
 Error analysis appears only for the best (⭐) and latest checkpoints.
-When present, it surfaces the weakest examples input and output, and its per-metric scores.
+When present, it surfaces the weakest examples, with the rendered prompt the LM saw (in a `rendered_prompt` fenced block), the program output, and its per-metric scores.
 
 {{ HISTORY }}
 
@@ -80,7 +80,7 @@ Removing or renaming them breaks rendering and makes the template unusable.
 If the real bottleneck lies outside the template, you can record it additionally as an advice for human review.
 These can be:
 - Changes in the output schema fields or their descriptions
-- Deterministic pre-/post-processing around the completion
+- Changes to the scaffold (e.g. truncation before the call, coercion after)
 - The model seems uncapable to adhere to the instructions
 - The example data is flawed, contradictory or plainly wrong
 You must still explore different options in any of these scenarios.

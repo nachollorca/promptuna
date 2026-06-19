@@ -1,21 +1,17 @@
 """Tests for promptuna.optimize."""
 
-import logging
+import json
 from typing import Literal
 from unittest.mock import patch
 
 import pytest
 from helpers import make_run_results, make_trial
-from lmdk import CompletionResponse
 from pydantic import BaseModel
 
 from promptuna.evaluate import RunInfo, RunResults, SuccessfulScoring
 from promptuna.optimize import (
     OptimizationResult,
-    Output,
     Step,
-    Thinking,
-    default_proposer,
     extract_output_schema,
     extract_program_source,
     optimize,
@@ -69,7 +65,7 @@ def test_render_history_marks_best_step_and_includes_templates(
     history = render_history([baseline, candidate])
 
     assert "⭐ best" in history
-    assert "<template>" in history
+    assert "````template" in history
     assert "### Template" in history
     assert "better template" in history
     assert "Δ +0.50 vs baseline" in history
@@ -148,17 +144,16 @@ def test_extract_output_schema_is_none_without_schema(experiment, examples, exac
     assert extract_output_schema([step]) is None
 
 
-def test_extract_output_schema_surfaces_model_source(experiment, example):
+def test_extract_output_schema_surfaces_json_schema(experiment, example):
     trial = make_trial(example, output_schema=_BlockSchema)
     results = RunResults(experiment=experiment, run=RunInfo(), trials=[trial], scorings=[])
     step = Step(prompt_template="t", result=results)
 
-    schema_source = extract_output_schema([step])
+    schema_json = extract_output_schema([step])
 
-    assert schema_source is not None
-    assert "class _BlockSchema" in schema_source
-    assert "confidence" in schema_source
-    assert "weak" in schema_source
+    assert schema_json is not None
+    schema = json.loads(schema_json)
+    assert schema["properties"]["confidence"]["enum"] == ["weak", "decent", "strong"]
 
 
 def test_extract_program_source_includes_program_body(experiment, examples, exact_match_metric):
@@ -170,7 +165,7 @@ def test_extract_program_source_includes_program_body(experiment, examples, exac
     assert "def echo_program" in source
 
 
-def test_extract_program_source_raises_for_unintrospectable_program(experiment):
+def test_extract_program_source_raises_when_unintrospectable(experiment):
     from functools import partial
 
     from helpers import echo_program
@@ -183,7 +178,7 @@ def test_extract_program_source_raises_for_unintrospectable_program(experiment):
     results = RunResults(experiment=experiment_no_source, run=RunInfo(), trials=[], scorings=[])
     step = Step(prompt_template="t", result=results)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="Cannot introspect program source"):
         extract_program_source([step])
 
 

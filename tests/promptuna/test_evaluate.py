@@ -3,6 +3,13 @@
 from unittest.mock import patch
 
 import pytest
+from helpers import (
+    echo_program,
+    fake_complete,
+    make_llm_judge_metric,
+    make_run_results,
+    make_trial,
+)
 
 from promptuna.evaluate import (
     Aggregate,
@@ -23,14 +30,6 @@ from promptuna.evaluate import (
 )
 from promptuna.program import Example
 from promptuna.run import FailedTrial, SuccessfulTrial, run_trial
-from helpers import (
-    echo_program,
-    fake_complete,
-    make_llm_judge_metric,
-    make_run_results,
-    make_trial,
-)
-
 
 # ---------------------------------------------------------------------------
 # Scales

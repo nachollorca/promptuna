@@ -13,6 +13,7 @@ stops early once a checkpoint scores perfectly (``overall.mean >= 1.0``).
 """
 
 import inspect
+import json
 import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -23,7 +24,7 @@ from pydantic import BaseModel, Field
 
 from promptuna.evaluate import Metric, RunResults, run_experiment
 from promptuna.program import Example, Experiment
-from promptuna.report import render_run
+from promptuna.report import fence_verbatim, render_run
 
 logger = logging.getLogger(__name__)
 
@@ -125,35 +126,37 @@ class Output(BaseModel):
     advice: str | None = Field(
         default=None,
         description=(
-            "Recommendations outside the editable template (schema, pre/post-processing), if any. "
+            "Recommendations outside the editable template (schema, scaffold), if any. "
             "Use only when the trajectory is not improving by just touching the template."
         ),
     )
 
 
-def extract_output_schema(steps: list[Step]) -> str | None:
-    """Python source of the program's structured-output schema, recovered from telemetry.
+_PROGRAM_SOURCE_ERROR = (
+    "Cannot introspect program source. Define the program in a .py module and import it — "
+    "functions defined in notebook cells (or wrapped with functools.partial) cannot be "
+    "introspected."
+)
 
-    Uses :func:`inspect.getsource` on the recovered Pydantic model class — same
-    no-fallback policy as :func:`extract_program_source`.
-    """
+
+def extract_output_schema(steps: list[Step]) -> str | None:
+    """JSON Schema of the program's structured-output Pydantic model, from telemetry."""
     for step in steps:
         for trial in step.result.successful_trials:
             request = trial.request
             if request is not None and request.output_schema is not None:
-                return inspect.getsource(request.output_schema)
+                return json.dumps(request.output_schema.model_json_schema(), indent=2)
     return None
 
 
 def extract_program_source(steps: list[Step]) -> str:
-    """Python source of the program under optimization.
-
-    Uses :func:`inspect.getsource` with no fallback — if introspection fails
-    (notebooks, ``functools.partial``, C extensions, etc.), the error propagates.
-    """
+    """Python source of the program under optimization."""
     program = steps[0].result.experiment.program if steps else None
     assert program is not None
-    return inspect.getsource(program)
+    try:
+        return inspect.getsource(program)
+    except (OSError, TypeError) as exc:
+        raise type(exc)(_PROGRAM_SOURCE_ERROR) from exc
 
 
 def render_metrics(steps: list[Step]) -> str:
@@ -291,7 +294,7 @@ def render_history(steps: list[Step]) -> str:
             _render_step_heading(step, i, baseline_score, is_best=i == best_index),
             "### Template",
             "",
-            f"<template>\n{step.prompt_template}\n</template>",
+            fence_verbatim("template", step.prompt_template),
             render_run(step.result, telemetry=False, error_format=error_format),
         ]
         step_blocks.append("\n\n".join(sections))
