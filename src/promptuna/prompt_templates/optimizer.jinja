@@ -58,10 +58,10 @@ Trial failures count against the run (the program is under evaluation); scorer f
 
 Each `## Step N` heading shows role (baseline or candidate), headline score, delta vs baseline, and `⭐ best` on the winning step so far.
 
-Each step opens with the verbatim template in a `template` block, then the quality and reliability results it produced.
+Each step opens with the verbatim template in a `template` fenced block, then the quality and reliability results it produced.
 
 Error analysis appears only for the best (⭐) and latest checkpoints.
-When present, it surfaces the weakest examples input and output, and its per-metric scores.
+When present, it surfaces the weakest examples, with the rendered prompt the LM saw (in a `rendered_prompt` fenced block), the program output, and its per-metric scores.
 
 {{ HISTORY }}
 

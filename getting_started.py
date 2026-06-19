@@ -384,4 +384,4 @@ print(best.prompt_template)
 # This is the complete trajectory:
 
 history = render_history(steps=optimization.steps)
-print(history.replace("<template>", "**Template**:\n\n```").replace("</template>", "```"))
+print(history)

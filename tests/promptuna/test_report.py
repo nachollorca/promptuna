@@ -64,7 +64,7 @@ def test_render_run_error_format_rendered_shows_rendered_prompt_and_output(
 
     assert "[0] first sentence" in markdown
     assert "Rendered Prompt:" in markdown
-    assert "<rendered_prompt>" in markdown
+    assert "````rendered_prompt" in markdown
     assert repr(trial.output) in markdown
     assert "<output>" not in markdown
     assert repr(weak_example.inputs) not in markdown
@@ -72,7 +72,7 @@ def test_render_run_error_format_rendered_shows_rendered_prompt_and_output(
 
 def test_render_run_rendered_prompt_with_fenced_markup_does_not_bleed(experiment, examples, exact_match_metric):
     # A rendered prompt that carries its own fenced markup must not bleed into
-    # the report — the tag delimiters isolate it.
+    # the report — the four-backtick fence isolates it from the outer markdown.
     weak_example = examples[1]
     trial = make_trial(weak_example, output=[0, 2], rendered_prompt="```\nfenced body\n```")
     results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
@@ -85,8 +85,8 @@ def test_render_run_rendered_prompt_with_fenced_markup_does_not_bleed(experiment
 
     markdown = render_run(results, telemetry=False, error_format="rendered")
 
-    assert "<rendered_prompt>" in markdown
-    assert "</rendered_prompt>" in markdown
+    assert "````rendered_prompt" in markdown
+    assert markdown.count("````") >= 2
     assert "#### Example" in markdown
     assert "**Quality:**" in markdown
 
