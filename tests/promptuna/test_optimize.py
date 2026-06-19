@@ -11,17 +11,34 @@ from pydantic import BaseModel
 from promptuna.evaluate import RunInfo, RunResults, SuccessfulScoring
 from promptuna.optimize import (
     OptimizationResult,
+    Proposal,
     Step,
+    Thinking,
     extract_output_schema,
     extract_program_source,
     optimize,
     render_history,
     render_metrics,
+    render_prior_rationale,
 )
 
 
 class _BlockSchema(BaseModel):
     confidence: Literal["weak", "decent", "strong"]
+
+
+def _sample_thinking(**overrides: str) -> Thinking:
+    defaults = {
+        "reinstate_goal": "Maximize headline score.",
+        "trajectory_summary": "Baseline weak; step 1 improved.",
+        "failure_analysis": "Model skips reasoning.",
+        "what_works": "Explicit step-by-step instructions.",
+        "what_hurts": "Overlong prompts add noise.",
+        "improvement_hypothesis": "Shorter rubric should reduce confusion.",
+        "edit_plan": "Refine best checkpoint; tighten scoring criteria.",
+    }
+    defaults.update(overrides)
+    return Thinking(**defaults)
 
 
 def test_step_score_reads_run_results_overall(experiment, examples, exact_match_metric):
@@ -123,6 +140,78 @@ def test_render_history_renders_rendered_prompt_only_for_best_and_last(
     assert history.count("### Error Analysis") == 2
 
 
+def test_render_history_shows_intent_for_proposed_steps(experiment, examples, exact_match_metric):
+    baseline = Step(
+        prompt_template="baseline template",
+        result=make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.4]),
+    )
+    candidate = Step(
+        prompt_template="better template",
+        result=make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.9]),
+        thinking=_sample_thinking(),
+    )
+
+    history = render_history([baseline, candidate])
+
+    assert history.count("### Intent") == 1
+    assert "**Hypothesis:** Shorter rubric should reduce confusion." in history
+    assert "**Edit plan:** Refine best checkpoint; tighten scoring criteria." in history
+    assert "Reinstate goal" not in history
+
+
+def test_render_prior_rationale_is_empty_for_baseline_only(experiment, examples, exact_match_metric):
+    baseline = Step(
+        prompt_template="baseline template",
+        result=make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.4]),
+    )
+
+    rationale = render_prior_rationale([baseline])
+
+    assert rationale == ""
+
+
+def test_render_prior_rationale_surfaces_last_proposal_thinking(
+    experiment, examples, exact_match_metric
+):
+    baseline = Step(
+        prompt_template="baseline template",
+        result=make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.4]),
+    )
+    candidate = Step(
+        prompt_template="better template",
+        result=make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.9]),
+        thinking=_sample_thinking(failure_analysis="Judges penalize formatting."),
+    )
+
+    rationale = render_prior_rationale([baseline, candidate])
+
+    assert "**Failure analysis:**" in rationale
+    assert "Judges penalize formatting." in rationale
+    assert "**Improvement hypothesis:**" in rationale
+
+
+def test_optimize_stores_thinking_from_proposer(
+    experiment, examples, exact_match_metric, fake_complete_factory
+):
+    thinking = _sample_thinking()
+
+    def proposer(steps, model):
+        return Proposal(thinking=thinking, prompt_template="Improved: {{ question }}")
+
+    with fake_complete_factory("wrong"):
+        result = optimize(
+            experiment=experiment,
+            examples=examples[:1],
+            metrics=[exact_match_metric],
+            proposer_model=experiment.model,
+            steps=1,
+            proposer=proposer,
+        )
+
+    assert result.steps[0].thinking is None
+    assert result.steps[1].thinking == thinking
+
+
 def test_render_metrics_is_empty_without_steps():
     assert render_metrics([]) == ""
 
@@ -197,7 +286,7 @@ def test_optimize_runs_baseline_and_one_proposed_step(
     experiment, examples, exact_match_metric, fake_complete_factory
 ):
     def proposer(steps, model):
-        return "Improved: {{ question }}"
+        return Proposal(thinking=None, prompt_template="Improved: {{ question }}")
 
     with fake_complete_factory("wrong"):
         result = optimize(
@@ -222,7 +311,7 @@ def test_optimize_stops_early_when_score_is_perfect(
 
     def proposer(steps, model):
         calls["n"] += 1
-        return "should not be evaluated"
+        return Proposal(thinking=None, prompt_template="should not be evaluated")
 
     perfect = make_run_results(experiment, examples[:1], exact_match_metric, scores=[1.0])
 
