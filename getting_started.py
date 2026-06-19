@@ -84,10 +84,11 @@ examples = [
 # ## Target Function
 # Now we define the program — the thing we actually want to evaluate.
 #
-# Note that it is not just a thin wrapper around the call to the language model complete():
-# there can be real pre- and post-processing around the model call. That's intentional. In
-# production, what users hit is rarely the raw completion; it's the completion plus the scaffold
-# around it. The harness lets us evaluate that full product.
+# Note that it is not just a thin wrapper around complete(): each program makes exactly one LM
+# completion, wrapped in a deterministic scaffold — code before the call (input shaping,
+# template rendering) and after (parsing, coercion, fallbacks). In production, users rarely hit
+# the raw completion; they hit the completion plus its scaffold. The harness evaluates that
+# full product.
 #
 # The function must adhere to the Program protocol: take its named inputs, the prompt template,
 # and an LM config, then return whatever the downstream scorers should consume. The harness unpacks
@@ -98,7 +99,7 @@ MAX_REVIEW_CHARS = 500
 
 
 def classify_sentiment(review: str, prompt_template: str, config: LMConfig) -> dict:
-    # Pre-processing: normalise whitespace and cap length
+    # Scaffold (pre): normalise whitespace and cap length
     cleaned = re.sub(r"\s+", " ", review).strip()
     if len(cleaned) > MAX_REVIEW_CHARS:
         cleaned = cleaned[:MAX_REVIEW_CHARS] + "…"
@@ -117,7 +118,7 @@ def classify_sentiment(review: str, prompt_template: str, config: LMConfig) -> d
         output_schema=Output,
     )
 
-    # Post-processing: normalize the label and fall back to "neutral"
+    # Scaffold (post): normalize the label and fall back to "neutral"
     label = (response.output.sentiment or "").strip().lower()
     if label not in ALLOWED_LABELS:
         label = "neutral"
