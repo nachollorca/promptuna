@@ -19,14 +19,26 @@ from promptuna.evaluate import (
     Score,
     SuccessfulScoring,
 )
-from promptuna.program import Example, Experiment, LMConfig
+from promptuna.program import Example, Experiment
 from promptuna.run import SuccessfulTrial
 
 
-def echo_program(prompt_template: str, config: LMConfig, **inputs: Any) -> str:
+def minimal_program(prompt_template: str, model: str, **inputs: Any) -> str:
+    """Like :func:`echo_program` but without an optional ``generation_kwargs`` param."""
+    prompt = render_template(prompt_template, **inputs)
+    response = lmdk.complete(model=model, prompt=prompt)
+    return response.content
+
+
+def echo_program(
+    prompt_template: str,
+    model: str,
+    generation_kwargs: dict[str, Any] | None = None,
+    **inputs: Any,
+) -> str:
     """Minimal program: render the template and call the model once."""
     prompt = render_template(prompt_template, **inputs)
-    response = lmdk.complete(model=config.model, prompt=prompt)
+    response = lmdk.complete(model=model, prompt=prompt, generation_kwargs=generation_kwargs)
     return response.content
 
 
@@ -153,13 +165,14 @@ def make_run_results(
     )
 
 
-def make_llm_judge_metric(lm_config: LMConfig) -> LLMJudgeMetric:
+def make_llm_judge_metric(model: str) -> LLMJudgeMetric:
     def judge(
         output: Any,
         example: Example,
         metric: LLMJudgeMetric,
-        config: LMConfig,
+        model: str,
         rendered_prompt: str,
+        generation_kwargs: dict[str, Any] | None = None,
     ) -> RawScore:
         return RawScore(raw=1.0, reason="judge approved")
 
@@ -168,6 +181,6 @@ def make_llm_judge_metric(lm_config: LMConfig) -> LLMJudgeMetric:
         description="Rate answer quality.",
         scale=Range(0.0, 1.0),
         scorer=judge,
-        config=lm_config,
+        model=model,
         prompt_template="Judge {{ OUTPUT }}",
     )

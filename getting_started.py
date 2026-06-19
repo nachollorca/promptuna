@@ -29,7 +29,7 @@ from promptuna.evaluate import (
     score_metric,
 )
 from promptuna.optimize import optimize, render_history
-from promptuna.program import Example, Experiment, LMConfig
+from promptuna.program import Example, Experiment
 from promptuna.report import render_run
 from promptuna.run import run_trial
 
@@ -88,14 +88,14 @@ examples = [
 # full product.
 #
 # The function must adhere to the Program protocol: take its named inputs, the prompt template,
-# and an LM config, then return whatever the downstream scorers should consume. The harness unpacks
+# and a model id, then return whatever the downstream scorers should consume. The harness unpacks
 # Example.inputs as keyword arguments, so the parameter names must match the dict keys.
 # The program and its output schema live in getting_started_program.py so the optimizer
 # can introspect them (see that module's docstring).
 
 # ## Knobs
 # Now, lets define the moving parts under test. The two sweepable axes are the prompt template
-# and the LM config (model, generation kwargs).
+# and the model.
 
 prompt_template = """Your task is to classify the sentiment of this product review:
 
@@ -104,19 +104,16 @@ prompt_template = """Your task is to classify the sentiment of this product revi
 The possible labels are 'positive', 'neutral' and 'negative'
 """
 
-config = LMConfig(
-    model="mistral:mistral-small-latest",
-    generation_kwargs={"temperature": 0.1},
-)
+model = "mistral:mistral-small-latest"
 
 # ## Trial
 # With these ingredients, we can already run a trial: execute the program on one example with
-# the config under test.
+# the model under test.
 
 trial = run_trial(
     program=classify_sentiment,
     prompt_template=prompt_template,
-    config=config,
+    model=model,
     example=examples[0],
 )
 
@@ -160,7 +157,7 @@ print("Label correctness score:", scoring.score)
 # open-ended judgement with no ground truth, which is exactly where an LLM judge earns its keep.
 #
 # We define an LLMJudgeMetric that grades the quality of the justification. It carries its own
-# LMConfig and judge prompt template. We use the built-in default_llm_judge, which feeds the judge
+# model and judge prompt template. We use the built-in default_llm_judge, which feeds the judge
 # the rendered prompt, the program's output, the reference, and the metric description.
 
 reason_quality = LLMJudgeMetric(
@@ -168,10 +165,7 @@ reason_quality = LLMJudgeMetric(
     description="Rates how well the 'reason' field justifies the predicted sentiment label given the original review.",
     scale=Ordinal(levels=["poor", "good"]),
     scorer=default_llm_judge,
-    config=LMConfig(
-        model="mistral:mistral-medium-latest",
-        generation_kwargs={"temperature": 0.1},
-    ),
+    model="mistral:mistral-medium-latest",
 )
 
 # Let's see what the judge thinks about the system output on our first trial.
@@ -186,7 +180,7 @@ print("Reason quality score:", judge_scoring.score)
 experiment = Experiment(
     program=classify_sentiment,
     prompt_template=prompt_template,
-    config=config,
+    model=model,
 )
 
 results = run_experiment(
@@ -331,10 +325,7 @@ optimization = optimize(
     experiment=experiment,
     examples=examples,
     metrics=[label_correctness, reason_quality],
-    proposer_config=LMConfig(
-        model="vertex:gemini-3.5-flash",
-        generation_kwargs={"temperature": 0.1},
-    ),
+    proposer_model="vertex:gemini-3.5-flash",
     steps=4,
     workers=5,
 )

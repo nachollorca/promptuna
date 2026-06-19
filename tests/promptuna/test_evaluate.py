@@ -28,7 +28,7 @@ from promptuna.evaluate import (
     score_metric,
     stream_experiment,
 )
-from promptuna.program import Example, LMConfig
+from promptuna.program import Example
 from promptuna.run import FailedTrial, SuccessfulTrial, run_trial
 
 # ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ def test_score_metric_applies_programmatic_scorer(example, exact_match_metric, f
         trial = run_trial(
             echo_program,
             "Answer: {{ question }}",
-            LMConfig(model="test:model"),
+            "test:model",
             example,
         )
     scoring = score_metric(trial, exact_match_metric)
@@ -264,22 +264,22 @@ def test_stream_experiment_with_empty_examples_raises(experiment, exact_match_me
 
 
 def test_run_experiment_runs_llm_judge_metrics_in_thread_pool(
-    experiment, examples, lm_config, fake_complete
+    experiment, examples, model, fake_complete
 ):
-    metric = make_llm_judge_metric(lm_config)
+    metric = make_llm_judge_metric(model)
     results = run_experiment(experiment, examples[:1], [metric], workers=2)
 
     assert len(results.scorings) == 1
     assert results.scorings[0].score.normalized == 1.0
 
 
-def test_default_llm_judge_uses_structured_output(lm_config, example):
+def test_default_llm_judge_uses_structured_output(model, example):
     metric = LLMJudgeMetric(
         name="judge",
         description="quality",
         scale=Range(0.0, 1.0),
         scorer=default_llm_judge,
-        config=lm_config,
+        model=model,
         prompt_template="Judge {{ OUTPUT }} for {{ METRIC }}",
     )
     trial = make_trial(example)
@@ -289,7 +289,7 @@ def test_default_llm_judge_uses_structured_output(lm_config, example):
             trial.output,
             example,
             metric,
-            lm_config,
+            model,
             trial.rendered_prompt,
         )
 

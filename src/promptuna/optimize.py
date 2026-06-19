@@ -23,7 +23,7 @@ from lmdk import complete, render_template
 from pydantic import BaseModel, Field
 
 from promptuna.evaluate import Metric, RunResults, run_experiment
-from promptuna.program import Example, Experiment, LMConfig
+from promptuna.program import Example, Experiment
 from promptuna.report import fence_verbatim, render_run
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ class Proposer(Protocol):
     """Generates the next candidate template from the trajectory so far."""
 
     def __call__(  # noqa: D102
-        self, steps: list[Step], config: LMConfig
+        self, steps: list[Step], model: str
     ) -> str: ...
 
 
@@ -174,13 +174,13 @@ def render_metrics(steps: list[Step]) -> str:
 
 
 def default_proposer(
-    steps: list[Step], config: LMConfig, template: str = default_proposer_template
+    steps: list[Step], model: str, template: str = default_proposer_template
 ) -> str:
     """Propose a new template from the trajectory via structured output.
 
     Args:
         steps: Chronological archive from :func:`optimize`.
-        config: Proposer model and generation kwargs.
+        model: Proposer model id.
         template: Jinja template; expects ``HISTORY``, ``METRICS``, ``OUTPUT_SCHEMA``,
             and ``PROGRAM_SOURCE`` variables.
 
@@ -196,10 +196,9 @@ def default_proposer(
         strip_curly_brackets=False,
     )
     response = complete(
-        model=config.model,
+        model=model,
         prompt=prompt,
         output_schema=Output,
-        generation_kwargs=config.generation_kwargs,
     )
     parsed = response.parsed
     assert parsed is not None, "proposer model returned no structured output"
@@ -210,7 +209,7 @@ def optimize(
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
-    proposer_config: LMConfig,
+    proposer_model: str,
     steps: int,
     proposer: Proposer = default_proposer,
     workers: int = 1,
@@ -225,7 +224,7 @@ def optimize(
         experiment: Baseline program and template; not mutated per candidate.
         examples: Dataset to optimize against.
         metrics: Scoring metrics for each candidate run.
-        proposer_config: Model for the proposer.
+        proposer_model: Model for the proposer.
         steps: Candidates to propose beyond the baseline (``>= 0``).
         proposer: Candidate generator; defaults to :func:`default_proposer`.
         workers: Thread-pool size per ``run_experiment`` call.
@@ -244,7 +243,7 @@ def optimize(
     for _ in range(steps):
         if archive[-1].score >= 1.0:
             break
-        candidate = proposer(steps=archive, config=proposer_config)
+        candidate = proposer(steps=archive, model=proposer_model)
         candidate_experiment = replace(experiment, prompt_template=candidate)
         result = run_experiment(
             experiment=candidate_experiment, examples=examples, metrics=metrics, workers=workers

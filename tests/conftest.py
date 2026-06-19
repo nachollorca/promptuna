@@ -19,7 +19,7 @@ from helpers import (
 )
 
 from promptuna.evaluate import Metric, ProgrammaticMetric, Range
-from promptuna.program import Example, Experiment, LMConfig
+from promptuna.program import Example, Experiment
 
 
 @pytest.fixture
@@ -36,16 +36,16 @@ def examples(example: Example) -> list[Example]:
 
 
 @pytest.fixture
-def lm_config() -> LMConfig:
-    return LMConfig(model="test:model")
+def model() -> str:
+    return "test:model"
 
 
 @pytest.fixture
-def experiment(lm_config: LMConfig) -> Experiment:
+def experiment(model: str) -> Experiment:
     return Experiment(
         program=echo_program,
         prompt_template="Answer: {{ question }}",
-        config=lm_config,
+        model=model,
     )
 
 
