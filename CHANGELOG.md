@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.16.0 (2026-06-19)
+
+### Features
+
+- **optimizer**: Account for the thinking process on the optimizing trajectory
+  ([`7453287`](https://github.com/nachollorca/promptuna/commit/74532870979b35608a8623363fc2c705b0b01346))
+
+
 ## v1.15.0 (2026-06-19)
 
 ### Documentation
