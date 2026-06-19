@@ -6,9 +6,15 @@ from promptuna.evaluate import Aggregate, Example, RunResults
 from promptuna.run import SuccessfulTrial
 
 _MAX_WEAK_EXAMPLES = 3
+_VERBATIM_FENCE = "````"
 
 MetricBreakdown = tuple[str, float, str]
 WeakExampleEntry = tuple[Example, float, list[MetricBreakdown]]
+
+
+def fence_verbatim(tag: str, content: str) -> str:
+    """Wrap *content* in a four-backtick fenced block labelled *tag*."""
+    return f"{_VERBATIM_FENCE}{tag}\n{content}\n{_VERBATIM_FENCE}"
 
 
 def _fmt(agg: Aggregate) -> str:
@@ -106,9 +112,7 @@ def _render_weak_example(
             [
                 "**Rendered Prompt:**",
                 "",
-                "<rendered_prompt>",
-                trial.rendered_prompt,
-                "</rendered_prompt>",
+                fence_verbatim("rendered_prompt", trial.rendered_prompt),
                 "",
                 "**Output:**",
                 "",

@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 
 from promptuna.evaluate import Metric, RunResults, run_experiment
 from promptuna.program import Example, Experiment, LMConfig
-from promptuna.report import render_run
+from promptuna.report import fence_verbatim, render_run
 
 logger = logging.getLogger(__name__)
 
@@ -292,7 +292,7 @@ def render_history(steps: list[Step]) -> str:
             _render_step_heading(step, i, baseline_score, is_best=i == best_index),
             "### Template",
             "",
-            f"<template>\n{step.prompt_template}\n</template>",
+            fence_verbatim("template", step.prompt_template),
             render_run(step.result, telemetry=False, error_format=error_format),
         ]
         step_blocks.append("\n\n".join(sections))
