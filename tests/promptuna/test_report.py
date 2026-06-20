@@ -1,6 +1,6 @@
 """Tests for promptuna.report."""
 
-from helpers import make_run_results, make_trial
+from helpers import make_run_results, make_trial, score_of
 
 from promptuna.evaluate import FailedScoring, Score, SuccessfulScoring
 from promptuna.report import render_run
@@ -27,14 +27,18 @@ def test_render_run_can_hide_telemetry(experiment, example, exact_match_metric):
     assert "### Telemetry" not in markdown
 
 
-def test_render_run_reports_all_perfect_when_no_weak_examples(experiment, example, exact_match_metric):
+def test_render_run_reports_all_perfect_when_no_weak_examples(
+    experiment, example, exact_match_metric
+):
     results = make_run_results(experiment, [example], exact_match_metric, scores=[1.0])
     markdown = render_run(results, telemetry=False)
 
     assert "All examples scored perfectly." in markdown
 
 
-def test_render_run_error_format_inputs_shows_dataset_inputs(experiment, examples, exact_match_metric):
+def test_render_run_error_format_inputs_shows_dataset_inputs(
+    experiment, examples, exact_match_metric
+):
     results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
     markdown = render_run(results, telemetry=False, error_format="inputs")
 
@@ -57,7 +61,7 @@ def test_render_run_error_format_rendered_shows_rendered_prompt_and_output(
     results.scorings[1] = SuccessfulScoring(
         trial=trial,
         metric=exact_match_metric,
-        score=results.scorings[1].score,
+        score=score_of(results.scorings[1]),
     )
 
     markdown = render_run(results, telemetry=False, error_format="rendered")
@@ -70,7 +74,9 @@ def test_render_run_error_format_rendered_shows_rendered_prompt_and_output(
     assert repr(weak_example.inputs) not in markdown
 
 
-def test_render_run_rendered_prompt_with_fenced_markup_does_not_bleed(experiment, examples, exact_match_metric):
+def test_render_run_rendered_prompt_with_fenced_markup_does_not_bleed(
+    experiment, examples, exact_match_metric
+):
     # A rendered prompt that carries its own fenced markup must not bleed into
     # the report — the four-backtick fence isolates it from the outer markdown.
     weak_example = examples[1]
@@ -80,7 +86,7 @@ def test_render_run_rendered_prompt_with_fenced_markup_does_not_bleed(experiment
     results.scorings[1] = SuccessfulScoring(
         trial=trial,
         metric=exact_match_metric,
-        score=results.scorings[1].score,
+        score=score_of(results.scorings[1]),
     )
 
     markdown = render_run(results, telemetry=False, error_format="rendered")
@@ -91,7 +97,9 @@ def test_render_run_rendered_prompt_with_fenced_markup_does_not_bleed(experiment
     assert "**Quality:**" in markdown
 
 
-def test_render_run_error_format_none_omits_error_analysis(experiment, examples, exact_match_metric):
+def test_render_run_error_format_none_omits_error_analysis(
+    experiment, examples, exact_match_metric
+):
     results = make_run_results(experiment, examples, exact_match_metric, scores=[1.0, 0.25])
     markdown = render_run(results, telemetry=False, error_format=None)
 

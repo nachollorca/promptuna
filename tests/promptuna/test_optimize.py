@@ -5,7 +5,7 @@ from typing import Literal
 from unittest.mock import patch
 
 import pytest
-from helpers import make_run_results, make_trial
+from helpers import make_run_results, make_trial, score_of
 from pydantic import BaseModel
 
 from promptuna.evaluate import RunInfo, RunResults, SuccessfulScoring
@@ -100,7 +100,7 @@ def test_render_history_uses_rendered_error_format(experiment, examples, exact_m
     result.scorings[0] = SuccessfulScoring(
         trial=trial,
         metric=exact_match_metric,
-        score=result.scorings[0].score,
+        score=score_of(result.scorings[0]),
     )
     step = Step(prompt_template="baseline template", result=result)
 
@@ -120,7 +120,7 @@ def test_render_history_renders_rendered_prompt_only_for_best_and_last(
         result = make_run_results(experiment, examples[:1], exact_match_metric, scores=[score])
         result.trials[0] = trial
         result.scorings[0] = SuccessfulScoring(
-            trial=trial, metric=exact_match_metric, score=result.scorings[0].score
+            trial=trial, metric=exact_match_metric, score=score_of(result.scorings[0])
         )
         return Step(prompt_template=template, result=result)
 
@@ -159,7 +159,9 @@ def test_render_history_shows_intent_for_proposed_steps(experiment, examples, ex
     assert "Reinstate goal" not in history
 
 
-def test_render_prior_rationale_is_empty_for_baseline_only(experiment, examples, exact_match_metric):
+def test_render_prior_rationale_is_empty_for_baseline_only(
+    experiment, examples, exact_match_metric
+):
     baseline = Step(
         prompt_template="baseline template",
         result=make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.4]),

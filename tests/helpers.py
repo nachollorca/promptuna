@@ -17,10 +17,17 @@ from promptuna.evaluate import (
     RunInfo,
     RunResults,
     Score,
+    Scoring,
     SuccessfulScoring,
 )
 from promptuna.program import Example, Experiment
-from promptuna.run import SuccessfulTrial
+from promptuna.run import FailedTrial, SuccessfulTrial
+
+
+def score_of(scoring: Scoring) -> Score:
+    """Narrow a scoring to its ``Score`` (test builders only emit successful scorings)."""
+    assert isinstance(scoring, SuccessfulScoring)
+    return scoring.score
 
 
 def minimal_program(prompt_template: str, model: str, **inputs: Any) -> str:
@@ -148,8 +155,8 @@ def make_run_results(
     *,
     scores: list[float],
 ) -> RunResults:
-    trials = [make_trial(ex) for ex in examples]
-    scorings = [
+    trials: list[SuccessfulTrial | FailedTrial] = [make_trial(ex) for ex in examples]
+    scorings: list[Scoring] = [
         SuccessfulScoring(
             trial=trial,
             metric=metric,

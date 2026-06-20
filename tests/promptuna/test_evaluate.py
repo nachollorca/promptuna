@@ -9,12 +9,14 @@ from helpers import (
     make_llm_judge_metric,
     make_run_results,
     make_trial,
+    score_of,
 )
 
 from promptuna.evaluate import (
     Aggregate,
     FailedScoring,
     LLMJudgeMetric,
+    Metric,
     Ordinal,
     ProgrammaticMetric,
     Range,
@@ -97,7 +99,9 @@ def test_aggregate_computes_sample_standard_deviation():
 # ---------------------------------------------------------------------------
 
 
-def test_score_metric_applies_programmatic_scorer(example, exact_match_metric, fake_complete_factory):
+def test_score_metric_applies_programmatic_scorer(
+    example, exact_match_metric, fake_complete_factory
+):
     with fake_complete_factory("4"):
         trial = run_trial(
             echo_program,
@@ -167,7 +171,9 @@ def test_run_results_summarizes_quality_and_reliability(experiment, examples, ex
     assert "exact_match" in results.per_metric()
 
 
-def test_run_results_telemetry_is_zero_without_successful_responses(experiment, example, exact_match_metric):
+def test_run_results_telemetry_is_zero_without_successful_responses(
+    experiment, example, exact_match_metric
+):
     failed = FailedTrial(example=example, error=RuntimeError("nope"))
     results = RunResults(
         experiment=experiment,
@@ -202,14 +208,14 @@ def test_run_results_telemetry_is_zero_without_successful_responses(experiment, 
     ],
 )
 def test_run_experiment_rejects_invalid_input(experiment, kwargs, match):
-    metrics = kwargs.pop("metrics")
+    metrics: list[Metric] = kwargs.pop("metrics")
     if metrics == [object()]:
         metrics = [
             ProgrammaticMetric(
                 name="m",
                 description="d",
                 scale=Range(0.0, 1.0),
-                scorer=lambda o, e: RawScore(raw=1.0),
+                scorer=lambda output, example: RawScore(raw=1.0),
             )
         ]
     with pytest.raises(ValueError, match=match):
@@ -221,7 +227,7 @@ def test_run_experiment_rejects_duplicate_metric_names(experiment, examples):
         name="dup",
         description="d",
         scale=Range(0.0, 1.0),
-        scorer=lambda o, e: RawScore(raw=1.0),
+        scorer=lambda output, example: RawScore(raw=1.0),
     )
     with pytest.raises(ValueError, match="unique"):
         run_experiment(experiment, examples, [metric, metric])
@@ -238,14 +244,16 @@ def test_run_experiment_rejects_empty_prompt_template(experiment, examples, exac
 # ---------------------------------------------------------------------------
 
 
-def test_run_experiment_scores_program_output(experiment, examples, exact_match_metric, fake_complete_factory):
+def test_run_experiment_scores_program_output(
+    experiment, examples, exact_match_metric, fake_complete_factory
+):
     with fake_complete_factory("4"):
         results = run_experiment(experiment, examples[:1], [exact_match_metric])
 
     assert len(results.trials) == 1
     assert isinstance(results.trials[0], SuccessfulTrial)
     assert len(results.scorings) == 1
-    assert results.scorings[0].score.normalized == 1.0
+    assert score_of(results.scorings[0]).normalized == 1.0
 
 
 def test_stream_experiment_yields_trials_before_scorings(
@@ -270,7 +278,7 @@ def test_run_experiment_runs_llm_judge_metrics_in_thread_pool(
     results = run_experiment(experiment, examples[:1], [metric], workers=2)
 
     assert len(results.scorings) == 1
-    assert results.scorings[0].score.normalized == 1.0
+    assert score_of(results.scorings[0]).normalized == 1.0
 
 
 def test_default_llm_judge_uses_structured_output(model, example):
