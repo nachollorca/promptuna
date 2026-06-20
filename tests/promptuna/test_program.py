@@ -1,6 +1,6 @@
 """Tests for promptuna.program."""
 
-from promptuna.program import Example, Experiment
+from promptuna.program import Example
 
 
 def test_example_stores_inputs_and_optional_reference():

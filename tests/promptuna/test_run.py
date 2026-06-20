@@ -2,7 +2,6 @@
 
 from helpers import minimal_program
 
-from promptuna.program import Example
 from promptuna.run import FailedTrial, SuccessfulTrial, run_trial
 
 
