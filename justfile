@@ -31,20 +31,32 @@ run-hooks:
 format *paths:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ "$#" -eq 0 ]; then set -- src; fi
+    if [ -n "{{paths}}" ]; then
+        set -- {{paths}}
+    else
+        set -- src
+    fi
     uv run ruff check --fix "$@"
     uv run ruff format "$@"
 
 check-types *paths:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ "$#" -eq 0 ]; then set -- src; fi
+    if [ -n "{{paths}}" ]; then
+        set -- {{paths}}
+    else
+        set -- src
+    fi
     uv run ty check "$@"
 
 check-complexity *paths:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ "$#" -eq 0 ]; then set -- src; fi
+    if [ -n "{{paths}}" ]; then
+        set -- {{paths}}
+    else
+        set -- src
+    fi
     uv run complexipy "$@"
 
 # Test and run ----------------------------------------------------------------
