@@ -24,6 +24,7 @@ from promptuna.evaluate import (
     Ordinal,
     ProgrammaticMetric,
     RawScore,
+    SuccessfulScoring,
     default_llm_judge,
     run_experiment,
     score_metric,
@@ -31,7 +32,7 @@ from promptuna.evaluate import (
 from promptuna.optimize import optimize, render_history
 from promptuna.program import Example, Experiment
 from promptuna.report import render_run
-from promptuna.run import run_trial
+from promptuna.run import SuccessfulTrial, run_trial
 
 # configure a simple exporter for the telemetry traces.
 logfire.configure(
@@ -117,6 +118,7 @@ trial = run_trial(
     example=examples[0],
 )
 
+assert isinstance(trial, SuccessfulTrial)
 print("Trial output:", trial.output)
 
 # ## Metrics
@@ -149,6 +151,7 @@ label_correctness = ProgrammaticMetric(
 # Now we score the trial against the metric.
 
 scoring = score_metric(trial=trial, metric=label_correctness)
+assert isinstance(scoring, SuccessfulScoring)
 print("Label correctness score:", scoring.score)
 
 # ### LLM as Judge Metrics
@@ -171,6 +174,7 @@ reason_quality = LLMJudgeMetric(
 # Let's see what the judge thinks about the system output on our first trial.
 
 judge_scoring = score_metric(trial=trial, metric=reason_quality)
+assert isinstance(judge_scoring, SuccessfulScoring)
 print("Reason quality score:", judge_scoring.score)
 
 # ## Experiment

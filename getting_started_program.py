@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, D101
+# ruff: noqa: D103, D101
 """Program and output schema for the getting started example.
 
 Keep this in a ``.py`` module so promptuna can introspect the program source when
@@ -6,12 +6,10 @@ optimizing from a notebook — define the program here and import it.
 """
 
 import re
-from typing import Literal
+from typing import Any, Literal
 
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
-
-from promptuna.program import LMConfig
 
 ALLOWED_LABELS = {"positive", "neutral", "negative"}
 MAX_REVIEW_CHARS = 500
@@ -22,7 +20,15 @@ class SentimentOutput(BaseModel):
     reason: str = Field(description="One short sentence justifying the sentiment label.")
 
 
-def classify_sentiment(review: str, prompt_template: str, config: LMConfig) -> dict:
+def classify_sentiment(
+    prompt_template: str,
+    model: str,
+    generation_kwargs: dict | None = None,
+    **inputs: Any,
+) -> dict:
+    # The harness unpacks ``Example.inputs`` as keyword arguments; pull ours out.
+    review: str = inputs["review"]
+
     # Pre-processing: normalise whitespace and cap length
     cleaned = re.sub(r"\s+", " ", review).strip()
     if len(cleaned) > MAX_REVIEW_CHARS:
@@ -30,8 +36,8 @@ def classify_sentiment(review: str, prompt_template: str, config: LMConfig) -> d
 
     prompt = render_template(template=prompt_template, REVIEW=cleaned)
     response = complete(
-        model=config.model,
-        generation_kwargs=config.generation_kwargs,
+        model=model,
+        generation_kwargs=generation_kwargs,
         prompt=prompt,
         output_schema=SentimentOutput,
     )
