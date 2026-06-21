@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.17.0 (2026-06-21)
+
+### Continuous Integration
+
+- Pass specific file paths to prek
+  ([`cad5053`](https://github.com/nachollorca/promptuna/commit/cad5053a0811c5e963723ca3b240a739e4e5b9c2))
+
+- **justfile**: Freeze uv commands so that lock file does not get updated at prek
+  ([`47b55d0`](https://github.com/nachollorca/promptuna/commit/47b55d0b7bbccf03482d69e9e6a7be217be139d7))
+
+### Documentation
+
+- **notebook**: Remove the LMConfig
+  ([`a8172d2`](https://github.com/nachollorca/promptuna/commit/a8172d2002d5ac6a09035da0b4879ed45d7880ff))
+
+### Features
+
+- **optimizer**: Stream results
+  ([`170b239`](https://github.com/nachollorca/promptuna/commit/170b2394e0252ef0ea53f2fe799ab09b839c6f45))
+
+### Testing
+
+- Enforce typing and linting in tests too
+  ([`681137f`](https://github.com/nachollorca/promptuna/commit/681137fb50cd8bc5dbc31113dd8295009765222c))
+
+
 ## v1.16.0 (2026-06-19)
 
 ### Features
