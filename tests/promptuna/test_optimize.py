@@ -20,7 +20,9 @@ from promptuna.optimize import (
     render_history,
     render_metrics,
     render_prior_rationale,
+    stream_optimize,
 )
+from promptuna.run import SuccessfulTrial
 
 
 class _BlockSchema(BaseModel):
@@ -316,8 +318,10 @@ def test_optimize_stops_early_when_score_is_perfect(
         return Proposal(thinking=None, prompt_template="should not be evaluated")
 
     perfect = make_run_results(experiment, examples[:1], exact_match_metric, scores=[1.0])
+    perfect_step = Step(prompt_template=experiment.prompt_template, result=perfect)
 
-    with patch("promptuna.optimize.run_experiment", return_value=perfect):
+    with patch("promptuna.optimize._stream_step") as stream_step:
+        stream_step.return_value = iter([perfect_step])
         result = optimize(
             experiment=experiment,
             examples=examples[:1],
@@ -329,3 +333,99 @@ def test_optimize_stops_early_when_score_is_perfect(
 
     assert len(result.steps) == 1
     assert calls["n"] == 0
+
+
+def test_stream_optimize_yields_trials_scorings_then_step(
+    experiment, examples, exact_match_metric, fake_complete_factory
+):
+    with fake_complete_factory("wrong"):
+        items = list(
+            stream_optimize(
+                experiment=experiment,
+                examples=examples[:1],
+                metrics=[exact_match_metric],
+                proposer_model=experiment.model,
+                steps=0,
+            )
+        )
+
+    assert len(items) == 3
+    assert isinstance(items[0], SuccessfulTrial)
+    assert isinstance(items[1], SuccessfulScoring)
+    assert isinstance(items[2], Step)
+
+
+def test_stream_optimize_rejects_negative_steps(experiment, examples, exact_match_metric):
+    with pytest.raises(ValueError, match="steps must be >= 0"):
+        list(
+            stream_optimize(
+                experiment=experiment,
+                examples=examples,
+                metrics=[exact_match_metric],
+                proposer_model=experiment.model,
+                steps=-1,
+            )
+        )
+
+
+def test_stream_optimize_matches_optimize(
+    experiment, examples, exact_match_metric, fake_complete_factory
+):
+    def proposer(steps, model):
+        return Proposal(thinking=None, prompt_template="Improved: {{ question }}")
+
+    with fake_complete_factory("wrong"):
+        streamed_steps = [
+            e
+            for e in stream_optimize(
+                experiment=experiment,
+                examples=examples[:1],
+                metrics=[exact_match_metric],
+                proposer_model=experiment.model,
+                steps=1,
+                proposer=proposer,
+                workers=1,
+            )
+            if isinstance(e, Step)
+        ]
+        blocked = optimize(
+            experiment=experiment,
+            examples=examples[:1],
+            metrics=[exact_match_metric],
+            proposer_model=experiment.model,
+            steps=1,
+            proposer=proposer,
+            workers=1,
+        )
+
+    assert len(streamed_steps) == len(blocked.steps)
+    for streamed, blocked_step in zip(streamed_steps, blocked.steps, strict=True):
+        assert streamed.prompt_template == blocked_step.prompt_template
+        assert streamed.score == blocked_step.score
+        assert len(streamed.result.trials) == len(blocked_step.result.trials)
+        assert len(streamed.result.scorings) == len(blocked_step.result.scorings)
+
+
+def test_stream_optimize_step_index_from_step_count(
+    experiment, examples, exact_match_metric, fake_complete_factory
+):
+    def proposer(steps, model):
+        return Proposal(thinking=None, prompt_template="Improved: {{ question }}")
+
+    with fake_complete_factory("wrong"):
+        completed_steps = 0
+        for event in stream_optimize(
+            experiment=experiment,
+            examples=examples[:1],
+            metrics=[exact_match_metric],
+            proposer_model=experiment.model,
+            steps=1,
+            proposer=proposer,
+        ):
+            if isinstance(event, Step):
+                assert completed_steps == 0 or completed_steps == 1
+                completed_steps += 1
+            else:
+                assert completed_steps in {0, 1}
+
+        assert completed_steps == 2

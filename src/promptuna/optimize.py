@@ -10,11 +10,16 @@ checkpoint clearly marked. The objective is fixed to ``RunResults.overall.mean``
 and the budget is a fixed number of steps; the archive keeps the best
 checkpoint, so the search may regress without losing the winner. Proposing
 stops early once a checkpoint scores perfectly (``overall.mean >= 1.0``).
+
+Use :func:`optimize` for a blocking result, or :func:`stream_optimize` to
+yield :class:`~promptuna.run.Trial`, :class:`~promptuna.evaluate.Scoring`, and
+:class:`Step` events as each checkpoint is evaluated.
 """
 
 import inspect
 import json
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
@@ -22,9 +27,10 @@ from typing import Protocol
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
 
-from promptuna.evaluate import Metric, RunResults, run_experiment
+from promptuna.evaluate import Metric, RunInfo, RunResults, Scoring, stream_experiment
 from promptuna.program import Example, Experiment
 from promptuna.report import fence_verbatim, render_run
+from promptuna.run import FailedTrial, SuccessfulTrial, Trial
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +221,106 @@ def default_proposer(
     return Proposal(thinking=parsed.thinking, prompt_template=parsed.prompt_template)
 
 
+def _stream_step(
+    *,
+    experiment: Experiment,
+    examples: list[Example],
+    metrics: list[Metric],
+    workers: int,
+    prompt_template: str,
+    thinking: Thinking | None,
+) -> Iterator[Trial | Scoring | Step]:
+    """Evaluate one checkpoint, yielding trials and scorings then the aggregated step."""
+    trials: list[Trial] = []
+    scorings: list[Scoring] = []
+    for item in stream_experiment(experiment, examples, metrics, workers=workers):
+        if isinstance(item, (SuccessfulTrial, FailedTrial)):
+            trials.append(item)
+        else:
+            scorings.append(item)
+        yield item
+    yield Step(
+        prompt_template=prompt_template,
+        result=RunResults(
+            experiment=experiment,
+            run=RunInfo(),
+            trials=trials,
+            scorings=scorings,
+        ),
+        thinking=thinking,
+    )
+
+
+def stream_optimize(
+    experiment: Experiment,
+    examples: list[Example],
+    metrics: list[Metric],
+    proposer_model: str,
+    steps: int,
+    proposer: Proposer = default_proposer,
+    workers: int = 1,
+) -> Iterator[Trial | Scoring | Step]:
+    """Search for a higher-scoring prompt template, yielding progress as it lands.
+
+    Yields a tagged union of three kinds of items:
+
+    - :class:`~promptuna.run.Trial` — one program run for the current checkpoint.
+    - :class:`~promptuna.evaluate.Scoring` — one metric applied to a trial.
+    - :class:`Step` — the aggregated checkpoint once every trial and scoring for
+      that step has finished.
+
+    Ordering contract:
+
+    1. Items for a step are contiguous: all of its trials and scorings, then
+       exactly one :class:`Step`.
+    2. Within a step, trial/scoring order matches :func:`stream_experiment`
+       (completion order; each trial before its scorings).
+    3. Between steps the proposer runs synchronously and emits nothing.
+    4. The stream ends after the last :class:`Step` (early stop when a
+       checkpoint scores perfectly is reflected in which steps appear).
+
+    To track which step a trial or scoring belongs to, count :class:`Step`
+    events already yielded — that is the index of the in-flight step. The
+    :class:`Step` event itself carries the same index.
+
+    All items are yielded on the consumer thread (the thread iterating this
+    generator), even though evaluation runs in a thread pool internally.
+    """
+    if steps < 0:
+        raise ValueError(f"steps must be >= 0, got {steps}")
+
+    archive: list[Step] = []
+
+    for event in _stream_step(
+        experiment=experiment,
+        examples=examples,
+        metrics=metrics,
+        workers=workers,
+        prompt_template=experiment.prompt_template,
+        thinking=None,
+    ):
+        yield event
+        if isinstance(event, Step):
+            archive.append(event)
+
+    for _ in range(steps):
+        if archive[-1].score >= 1.0:
+            break
+        proposal = proposer(steps=archive, model=proposer_model)
+        candidate_experiment = replace(experiment, prompt_template=proposal.prompt_template)
+        for event in _stream_step(
+            experiment=candidate_experiment,
+            examples=examples,
+            metrics=metrics,
+            workers=workers,
+            prompt_template=proposal.prompt_template,
+            thinking=proposal.thinking,
+        ):
+            yield event
+            if isinstance(event, Step):
+                archive.append(event)
+
+
 def optimize(
     experiment: Experiment,
     examples: list[Example],
@@ -230,6 +336,9 @@ def optimize(
     split — holdout evaluation is the caller's responsibility). See the module
     docstring for loop details.
 
+    Blocks until the search finishes. For incremental consumption use
+    :func:`stream_optimize`.
+
     Args:
         experiment: Baseline program and template; not mutated per candidate.
         examples: Dataset to optimize against.
@@ -242,30 +351,18 @@ def optimize(
     Returns:
         Chronological archive; see :attr:`OptimizationResult.best`.
     """
-    if steps < 0:
-        raise ValueError(f"steps must be >= 0, got {steps}")
-
-    baseline = run_experiment(
-        experiment=experiment, examples=examples, metrics=metrics, workers=workers
-    )
-    archive = [Step(prompt_template=experiment.prompt_template, result=baseline)]
-
-    for _ in range(steps):
-        if archive[-1].score >= 1.0:
-            break
-        proposal = proposer(steps=archive, model=proposer_model)
-        candidate_experiment = replace(experiment, prompt_template=proposal.prompt_template)
-        result = run_experiment(
-            experiment=candidate_experiment, examples=examples, metrics=metrics, workers=workers
-        )
-        archive.append(
-            Step(
-                prompt_template=proposal.prompt_template,
-                result=result,
-                thinking=proposal.thinking,
-            )
-        )
-
+    archive: list[Step] = []
+    for event in stream_optimize(
+        experiment=experiment,
+        examples=examples,
+        metrics=metrics,
+        proposer_model=proposer_model,
+        steps=steps,
+        proposer=proposer,
+        workers=workers,
+    ):
+        if isinstance(event, Step):
+            archive.append(event)
     return OptimizationResult(steps=archive)
 
 
