@@ -25,7 +25,14 @@ from lmdk import CompletionResponse, complete, render_template
 from pydantic import BaseModel, ConfigDict, create_model
 
 from promptuna.program import Example, Experiment
-from promptuna.run import FailedTrial, SuccessfulTrial, Trial, run_trial
+from promptuna.run import (
+    FailedTrial,
+    SuccessfulTrial,
+    Trial,
+    _stream_trials,
+    _validate_examples,
+    _validate_experiment,
+)
 
 # ---------------------------------------------------------------------------
 # Scoring: scales, scores, scorers, metrics
@@ -528,36 +535,14 @@ def stream_experiment(
         return
 
     with ThreadPoolExecutor(max_workers=max(workers, 1)) as pool:
-        trial_futures = _submit_trials(pool, experiment, examples)
         score_futures: list[Future[Scoring]] = []
 
-        for fut in as_completed(trial_futures):
-            trial = fut.result()  # run_trial never raises
+        for trial in _stream_trials(pool, experiment, examples):
             yield trial
             yield from _dispatch_scorings(pool, trial, metrics, score_futures)
 
         for fut in as_completed(score_futures):
             yield fut.result()  # score_metric never raises
-
-
-def _submit_trials(
-    pool: ThreadPoolExecutor,
-    experiment: Experiment,
-    examples: list[Example],
-) -> dict[Future[Trial], Example]:
-    """Submit one trial future per ``(example, replicate)`` pair."""
-    return {
-        pool.submit(
-            run_trial,
-            experiment.program,
-            experiment.prompt_template,
-            experiment.model,
-            ex,
-            replicate=r,
-        ): ex
-        for ex in examples
-        for r in range(experiment.repeats)
-    }
 
 
 def _dispatch_scorings(
@@ -634,18 +619,6 @@ def _validate_run(
     _validate_experiment(experiment)
 
 
-def _validate_examples(examples: list[Example]) -> None:
-    if not examples:
-        raise ValueError("examples is empty")
-
-    has_ref = [ex.reference is not None for ex in examples]
-    if any(has_ref) and not all(has_ref):
-        raise ValueError(
-            "examples mix rows with and without `reference`; "
-            "make this all-or-nothing so reference-dependent metrics are unambiguous"
-        )
-
-
 def _validate_metrics(metrics: list[Metric]) -> None:
     if not metrics:
         raise ValueError("no metrics provided")
@@ -662,12 +635,3 @@ def _validate_metrics(metrics: list[Metric]) -> None:
                 raise ValueError(f"metric {m.name!r}: prompt_template is empty")
             if m.repeats < 1:
                 raise ValueError(f"metric {m.name!r}: repeats must be >= 1, got {m.repeats}")
-
-
-def _validate_experiment(experiment: Experiment) -> None:
-    if not experiment.prompt_template:
-        raise ValueError("experiment.prompt_template is empty")
-    if not experiment.model:
-        raise ValueError("experiment.model is empty")
-    if experiment.repeats < 1:
-        raise ValueError(f"experiment.repeats must be >= 1, got {experiment.repeats}")

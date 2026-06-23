@@ -1,8 +1,9 @@
 """Tests for promptuna.run."""
 
+import pytest
 from helpers import minimal_program
 
-from promptuna.run import FailedTrial, SuccessfulTrial, run_trial
+from promptuna.run import FailedTrial, SuccessfulTrial, run_trial, stream_run
 
 
 def test_run_trial_returns_successful_trial_with_observed_completion(
@@ -76,3 +77,33 @@ def test_run_trial_preserves_replicate_index(experiment, example, fake_complete)
     )
 
     assert trial.replicate == 2
+
+
+def test_stream_run_yields_one_trial_per_example(experiment, examples, fake_complete_factory):
+    with fake_complete_factory("4"):
+        trials = list(stream_run(experiment, examples[:1]))
+
+    assert len(trials) == 1
+    assert isinstance(trials[0], SuccessfulTrial)
+    assert trials[0].output == "4"
+
+
+def test_stream_run_with_empty_examples_raises(experiment):
+    with pytest.raises(ValueError, match="examples is empty"):
+        list(stream_run(experiment, []))
+
+
+def test_stream_run_respects_repeats(experiment, example, fake_complete):
+    experiment.repeats = 3
+    trials = list(stream_run(experiment, [example]))
+
+    assert len(trials) == 3
+    assert {t.replicate for t in trials} == {0, 1, 2}
+
+
+def test_stream_run_uses_thread_pool(experiment, examples, fake_complete_factory):
+    with fake_complete_factory("4"):
+        trials = list(stream_run(experiment, examples, workers=2))
+
+    assert len(trials) == len(examples)
+    assert all(isinstance(t, SuccessfulTrial) for t in trials)
