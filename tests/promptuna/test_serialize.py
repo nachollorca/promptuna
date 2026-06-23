@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from promptuna.evaluate import FailedScoring, Score, SuccessfulScoring
 from promptuna.optimize import Proposal, Step, Thinking, stream_optimize
 from promptuna.run import FailedTrial
-from promptuna.serialize import serialize_event
+from promptuna.serialize import serialize_error, serialize_event
 
 
 class _BlockSchema(BaseModel):
@@ -35,13 +35,26 @@ def _sample_thinking() -> Thinking:
     )
 
 
+def test_serialize_error():
+    event = serialize_error(job_id="job-1", seq=5, message="worker crashed")
+
+    assert event == {
+        "seq": 5,
+        "job_id": "job-1",
+        "step_index": 0,
+        "type": "error",
+        "payload": {"message": "worker crashed"},
+    }
+    _assert_json_roundtrip(event)
+
+
 def test_serialize_successful_trial(experiment, example, exact_match_metric):
     trial = make_trial(example, output="4", rendered_prompt="Answer: 2+2?")
 
-    event = serialize_event(trial, run_id="run-1", seq=0, step_index=0)
+    event = serialize_event(trial, job_id="run-1", seq=0, step_index=0)
 
     assert event["seq"] == 0
-    assert event["run_id"] == "run-1"
+    assert event["job_id"] == "run-1"
     assert event["step_index"] == 0
     assert event["type"] == "trial"
     payload = event["payload"]
@@ -58,7 +71,7 @@ def test_serialize_successful_trial(experiment, example, exact_match_metric):
 def test_serialize_failed_trial(example):
     trial = FailedTrial(example=example, error=ValueError("boom"), replicate=1)
 
-    event = serialize_event(trial, run_id="run-1", seq=1, step_index=0)
+    event = serialize_event(trial, job_id="run-1", seq=1, step_index=0)
 
     payload = event["payload"]
     assert payload["status"] == "failed"
@@ -76,12 +89,12 @@ def test_serialize_successful_scoring(experiment, example, exact_match_metric):
         score=Score(raw=1.0, normalized=1.0, reason="exact match"),
     )
 
-    event = serialize_event(scoring, run_id="run-1", seq=2, step_index=0)
+    event = serialize_event(scoring, job_id="run-1", seq=2, step_index=0)
 
     payload = event["payload"]
     assert event["type"] == "scoring"
     assert payload["status"] == "success"
-    trial_event = serialize_event(trial, run_id="x", seq=0, step_index=0)
+    trial_event = serialize_event(trial, job_id="x", seq=0, step_index=0)
     assert payload["trial_id"] == trial_event["payload"]["trial_id"]
     assert payload["metric"] == {
         "name": "exact_match",
@@ -104,7 +117,7 @@ def test_serialize_failed_scoring(experiment, example, exact_match_metric):
         error=RuntimeError("judge crashed"),
     )
 
-    event = serialize_event(scoring, run_id="run-1", seq=3, step_index=0)
+    event = serialize_event(scoring, job_id="run-1", seq=3, step_index=0)
 
     payload = event["payload"]
     assert payload["status"] == "failed"
@@ -121,7 +134,7 @@ def test_serialize_step(experiment, examples, exact_match_metric):
         thinking=_sample_thinking(),
     )
 
-    event = serialize_event(step, run_id="run-1", seq=4, step_index=0)
+    event = serialize_event(step, job_id="run-1", seq=4, step_index=0)
 
     payload = event["payload"]
     assert event["type"] == "step"
@@ -139,7 +152,7 @@ def test_serialize_step_without_thinking(experiment, examples, exact_match_metri
     result = make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.5])
     step = Step(prompt_template="baseline", result=result)
 
-    event = serialize_event(step, run_id="run-1", seq=0, step_index=0)
+    event = serialize_event(step, job_id="run-1", seq=0, step_index=0)
 
     assert event["payload"]["thinking"] is None
     _assert_json_roundtrip(event)
@@ -148,7 +161,7 @@ def test_serialize_step_without_thinking(experiment, examples, exact_match_metri
 def test_serialize_output_schema_in_trial_telemetry(experiment, example):
     trial = make_trial(example, output_schema=_BlockSchema)
 
-    event = serialize_event(trial, run_id="run-1", seq=0, step_index=0)
+    event = serialize_event(trial, job_id="run-1", seq=0, step_index=0)
 
     schema = event["payload"]["telemetry"]["request"]["output_schema"]
     assert schema["properties"]["confidence"]["enum"] == ["weak", "decent", "strong"]
@@ -162,7 +175,7 @@ def test_serialize_non_json_output_uses_fallback(example):
 
     trial = make_trial(example, output=CustomOutput())
 
-    event = serialize_event(trial, run_id="run-1", seq=0, step_index=0)
+    event = serialize_event(trial, job_id="run-1", seq=0, step_index=0)
 
     assert event["payload"]["output"] == {
         "value": "CustomOutput()",
@@ -190,10 +203,10 @@ def test_stream_optimize_events_are_json_serializable(
             )
         ):
             if isinstance(item, Step):
-                event = serialize_event(item, run_id="test-run", seq=seq, step_index=step_index)
+                event = serialize_event(item, job_id="test-run", seq=seq, step_index=step_index)
                 step_index += 1
             else:
-                event = serialize_event(item, run_id="test-run", seq=seq, step_index=step_index)
+                event = serialize_event(item, job_id="test-run", seq=seq, step_index=step_index)
             _assert_json_roundtrip(event)
             assert event["type"] in {"trial", "scoring", "step"}
 

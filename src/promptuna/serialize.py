@@ -1,8 +1,9 @@
-"""Serialize :func:`~promptuna.optimize.stream_optimize` events to JSON-safe envelopes.
+"""Serialize streaming job events to JSON-safe envelopes.
 
 Each yielded ``Trial``, ``Scoring``, or ``Step`` is wrapped in a stable envelope
-suitable for SSE transport and unit tests. Callers assign ``seq`` and
-``step_index`` as events are emitted.
+suitable for SSE transport and unit tests. Fatal job failures use
+:func:`serialize_error`. Callers assign ``seq`` and ``step_index`` as events are
+emitted. ``step`` events appear only on optimize jobs.
 """
 
 import hashlib
@@ -24,13 +25,13 @@ from promptuna.optimize import Step
 from promptuna.program import Example
 from promptuna.run import FailedTrial, SuccessfulTrial, Trial
 
-EventType = Literal["trial", "scoring", "step"]
+EventType = Literal["trial", "scoring", "step", "error"]
 
 
 def serialize_event(
     event: Trial | Scoring | Step,
     *,
-    run_id: str,
+    job_id: str,
     seq: int,
     step_index: int,
 ) -> dict[str, Any]:
@@ -49,10 +50,27 @@ def serialize_event(
 
     return {
         "seq": seq,
-        "run_id": run_id,
+        "job_id": job_id,
         "step_index": step_index,
         "type": event_type,
         "payload": payload,
+    }
+
+
+def serialize_error(
+    *,
+    job_id: str,
+    seq: int,
+    message: str,
+    step_index: int = 0,
+) -> dict[str, Any]:
+    """Build a JSON-safe error envelope for fatal job failures."""
+    return {
+        "seq": seq,
+        "job_id": job_id,
+        "step_index": step_index,
+        "type": "error",
+        "payload": {"message": message},
     }
 
 
@@ -67,7 +85,7 @@ def _trial_id(trial: Trial) -> str:
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
-def _serialize_error(error: Exception) -> dict[str, str]:
+def _exception_error(error: Exception) -> dict[str, str]:
     return {"type": type(error).__name__, "message": str(error)}
 
 
@@ -157,7 +175,7 @@ def _serialize_trial(trial: Trial) -> dict[str, Any]:
         if telemetry:
             payload["telemetry"] = telemetry
     else:
-        payload["error"] = _serialize_error(trial.error)
+        payload["error"] = _exception_error(trial.error)
     return payload
 
 
@@ -185,7 +203,7 @@ def _serialize_scoring(scoring: Scoring) -> dict[str, Any]:
         }
     else:
         payload["status"] = "failed"
-        payload["error"] = _serialize_error(scoring.error)
+        payload["error"] = _exception_error(scoring.error)
     return payload
 
 
