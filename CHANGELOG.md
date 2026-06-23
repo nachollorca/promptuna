@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.18.0 (2026-06-23)
+
+### Features
+
+- **run**: Add stream_run function that is parallel to stream_experiment and stream_optimize
+  ([`d3494d5`](https://github.com/nachollorca/promptuna/commit/d3494d55482d1f5612ff9d53b7c38f990735fd2a))
+
+- **serialize**: Add JSON event envelopes for stream_optimize
+  ([`64dd36e`](https://github.com/nachollorca/promptuna/commit/64dd36e624926383668addecada5b36bd61b5018))
+
+- **serialize**: Rename run_id to job_id and add serialize_error
+  ([`28cc193`](https://github.com/nachollorca/promptuna/commit/28cc193b2ebb9690665e428acdccc041f04e1e8a))
+
+
 ## v1.17.0 (2026-06-21)
 
 ### Continuous Integration
