@@ -2,15 +2,21 @@
 
 :func:`run_trial` is a total function: it never raises, wrapping failures into
 :class:`FailedTrial` so callers can treat crashed programs as data.
+
+:func:`stream_run` runs trials over a dataset with a thread pool, yielding each
+:class:`Trial` as it completes. For scoring use
+:func:`promptuna.evaluate.stream_experiment`.
 """
 
 import inspect
+from collections.abc import Iterator
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 
 from lmdk import CompletionRequest, CompletionResponse, observe
 
-from promptuna.program import Example, Program
+from promptuna.program import Example, Experiment, Program
 
 
 @dataclass(frozen=True)
@@ -100,3 +106,71 @@ def run_trial(
         )
     except Exception as err:
         return FailedTrial(example=example, error=err, replicate=replicate)
+
+
+def stream_run(
+    experiment: Experiment,
+    examples: list[Example],
+    workers: int = 1,
+) -> Iterator[Trial]:
+    """Run ``experiment`` over ``examples``, yielding trials as they land.
+
+    Order is not deterministic: trials arrive in completion order. Each
+    ``(example, replicate)`` pair becomes one trial when ``experiment.repeats``
+    is greater than one.
+    """
+    _validate_experiment(experiment)
+    _validate_examples(examples)
+
+    with ThreadPoolExecutor(max_workers=max(workers, 1)) as pool:
+        yield from _stream_trials(pool, experiment, examples)
+
+
+def _stream_trials(
+    pool: ThreadPoolExecutor,
+    experiment: Experiment,
+    examples: list[Example],
+) -> Iterator[Trial]:
+    for fut in as_completed(_submit_trials(pool, experiment, examples)):
+        yield fut.result()  # run_trial never raises
+
+
+def _submit_trials(
+    pool: ThreadPoolExecutor,
+    experiment: Experiment,
+    examples: list[Example],
+) -> dict[Future[Trial], Example]:
+    """Submit one trial future per ``(example, replicate)`` pair."""
+    return {
+        pool.submit(
+            run_trial,
+            experiment.program,
+            experiment.prompt_template,
+            experiment.model,
+            ex,
+            replicate=r,
+        ): ex
+        for ex in examples
+        for r in range(experiment.repeats)
+    }
+
+
+def _validate_examples(examples: list[Example]) -> None:
+    if not examples:
+        raise ValueError("examples is empty")
+
+    has_ref = [ex.reference is not None for ex in examples]
+    if any(has_ref) and not all(has_ref):
+        raise ValueError(
+            "examples mix rows with and without `reference`; "
+            "make this all-or-nothing so reference-dependent metrics are unambiguous"
+        )
+
+
+def _validate_experiment(experiment: Experiment) -> None:
+    if not experiment.prompt_template:
+        raise ValueError("experiment.prompt_template is empty")
+    if not experiment.model:
+        raise ValueError("experiment.model is empty")
+    if experiment.repeats < 1:
+        raise ValueError(f"experiment.repeats must be >= 1, got {experiment.repeats}")
