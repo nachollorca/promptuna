@@ -47,3 +47,6 @@ run file:
 # Project specific commands ---------------------------------------------------
 notebook:
     uv run --frozen jupyter lab
+
+server:
+    uv run uvicorn promptuna_server.main:app --reload --port 6969
