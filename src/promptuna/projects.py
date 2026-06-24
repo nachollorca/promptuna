@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import os
 import re
 import sys
 from collections.abc import Callable
@@ -28,12 +29,26 @@ def default_projects_root() -> Path:
 
 
 def get_projects_root() -> Path:
-    """Return the active projects root (overridable in tests)."""
-    return _projects_root if _projects_root is not None else default_projects_root()
+    """Return the active projects root.
+
+    Resolution order (highest priority first):
+
+    1. :func:`set_projects_root` — programmatic override (typically tests)
+    2. ``PROMPTUNA_PROJECTS_ROOT`` — environment variable
+    3. :func:`default_projects_root` — bundled ``samples/`` in a dev checkout
+    """
+    if _projects_root is not None:
+        return _projects_root
+
+    env_root = os.environ.get("PROMPTUNA_PROJECTS_ROOT")
+    if env_root:
+        return Path(env_root).expanduser().resolve()
+
+    return default_projects_root()
 
 
 def set_projects_root(path: Path | None) -> None:
-    """Override the projects root directory (tests only)."""
+    """Override the projects root directory programmatically."""
     global _projects_root
     _projects_root = path
 

@@ -37,3 +37,13 @@ Plain Jinja2 templates. Placeholder names must match what the program passes to 
 ### `data/*.jsonl`
 
 One JSON object per line with an `inputs` dict and an optional `reference`. Loaded via `promptuna.load.load_jsonl` into `Example` rows.
+
+## Projects root
+
+The loader discovers projects as subdirectories of a **projects root**. Resolution order (highest priority first):
+
+1. **`set_projects_root()`** — programmatic override (typically in tests)
+2. **`PROMPTUNA_PROJECTS_ROOT`** — environment variable pointing at a directory
+3. **Default** — repo `samples/` in a development checkout
+
+Each immediate subdirectory of the projects root is one project (e.g. `classify_sentiment/`).
