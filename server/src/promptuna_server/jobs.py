@@ -1,4 +1,4 @@
-"""Job lifecycle: background threads, queues, and SSE event bridging."""
+"""Job lifecycle: background threads, queues, SSE event bridging, and on-disk jobs."""
 
 from __future__ import annotations
 
@@ -8,25 +8,16 @@ import threading
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
 from promptuna.evaluate import Metric, stream_experiment
+from promptuna.jobs import JobArchive, JobConfig, JobKind, JobStatus, get_jobs_root
 from promptuna.optimize import Step, stream_optimize
 from promptuna.program import Example, Experiment
 from promptuna.run import stream_run
 from promptuna.serialize import serialize_error, serialize_event
 
-JobStatus = Literal["running", "done", "error"]
 _WAIT_TIMEOUT_SECONDS = 1.0
-
-
-class JobKind(StrEnum):
-    """Discriminator for which library stream drives a job."""
-
-    RUN = "run"
-    EVALUATE = "evaluate"
-    OPTIMIZE = "optimize"
 
 
 @dataclass
@@ -35,6 +26,7 @@ class JobState:
 
     job_id: str
     kind: JobKind
+    archive: JobArchive
     status: JobStatus = "running"
     events: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
@@ -52,6 +44,7 @@ def _has_running_job() -> bool:
 def _append_event(job: JobState, envelope: dict[str, Any]) -> None:
     with job._cond:
         job.events.append(envelope)
+        job.archive.append_event(envelope)
         job._cond.notify_all()
 
 
@@ -62,14 +55,16 @@ def _finish_job(job: JobState) -> None:
 
 def start_run_job(
     *,
+    config: JobConfig,
     experiment: Experiment,
     examples: list[Example],
     workers: int,
 ) -> str:
     """Start a run job and return its ``job_id``."""
     return _start_job(
-        JobKind.RUN,
+        "run",
         _run_worker,
+        config=config,
         experiment=experiment,
         examples=examples,
         workers=workers,
@@ -78,6 +73,7 @@ def start_run_job(
 
 def start_evaluate_job(
     *,
+    config: JobConfig,
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
@@ -85,8 +81,9 @@ def start_evaluate_job(
 ) -> str:
     """Start an evaluate job and return its ``job_id``."""
     return _start_job(
-        JobKind.EVALUATE,
+        "evaluate",
         _evaluate_worker,
+        config=config,
         experiment=experiment,
         examples=examples,
         metrics=metrics,
@@ -96,6 +93,7 @@ def start_evaluate_job(
 
 def start_optimize_job(
     *,
+    config: JobConfig,
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
@@ -105,8 +103,9 @@ def start_optimize_job(
 ) -> str:
     """Start an optimize job and return its ``job_id``."""
     return _start_job(
-        JobKind.OPTIMIZE,
+        "optimize",
         _optimize_worker,
+        config=config,
         experiment=experiment,
         examples=examples,
         metrics=metrics,
@@ -116,12 +115,13 @@ def start_optimize_job(
     )
 
 
-def _start_job(kind: JobKind, worker, **kwargs: Any) -> str:
+def _start_job(kind: JobKind, worker, *, config: JobConfig, **kwargs: Any) -> str:
     with _jobs_lock:
         if _has_running_job():
             raise ConflictError("another job is already running")
         job_id = str(uuid.uuid4())
-        job = JobState(job_id=job_id, kind=kind)
+        archive = JobArchive.open(get_jobs_root(), job_id, config)
+        job = JobState(job_id=job_id, kind=kind, archive=archive)
         _jobs[job_id] = job
 
     thread = threading.Thread(
@@ -129,7 +129,7 @@ def _start_job(kind: JobKind, worker, **kwargs: Any) -> str:
         args=(job, worker),
         kwargs=kwargs,
         daemon=True,
-        name=f"promptuna-{kind.value}-{job_id[:8]}",
+        name=f"promptuna-{kind}-{job_id[:8]}",
     )
     thread.start()
     return job_id
@@ -161,6 +161,7 @@ def _job_thread(job: JobState, worker, **kwargs: Any) -> None:
             if envelope["type"] == "step":
                 step_index += 1
         job.status = "done"
+        job.archive.finalize("done")
     except Exception as exc:
         job.status = "error"
         job.error = str(exc)
@@ -168,6 +169,7 @@ def _job_thread(job: JobState, worker, **kwargs: Any) -> None:
             job,
             serialize_error(job_id=job.job_id, seq=seq, message=str(exc), step_index=step_index),
         )
+        job.archive.finalize("error", error=str(exc))
     finally:
         _finish_job(job)
 
@@ -229,13 +231,6 @@ def _optimize_worker(
         seq += 1
 
 
-def _wait_for_events(job: JobState, offset: int) -> tuple[list[dict[str, Any]], bool]:
-    with job._cond:
-        while offset >= len(job.events) and job.status == "running":
-            job._cond.wait(timeout=_WAIT_TIMEOUT_SECONDS)
-        return job.events[offset:], job.status != "running"
-
-
 async def stream_job_events(job_id: str):
     """Async generator yielding SSE ``data:`` lines for ``job_id``."""
     job = get_job(job_id)
@@ -247,6 +242,13 @@ async def stream_job_events(job_id: str):
             offset += 1
         if done and offset >= len(job.events):
             break
+
+
+def _wait_for_events(job: JobState, offset: int) -> tuple[list[dict[str, Any]], bool]:
+    with job._cond:
+        while offset >= len(job.events) and job.status == "running":
+            job._cond.wait(timeout=_WAIT_TIMEOUT_SECONDS)
+        return job.events[offset:], job.status != "running"
 
 
 def reset_jobs() -> None:
