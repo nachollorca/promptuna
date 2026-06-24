@@ -16,14 +16,24 @@ dependencies = [
 dev = [
     "catppuccin-jupyterlab>=0.2.5",
     "complexipy",
+    "fastapi>=0.115.0",
+    "httpx>=0.28.0",
     "ipykernel>=7.2.0",
     "jupyter>=1.1.1",
     "logfire>=4.36.0",
+    "promptuna-server",
     "pytest>=9.0.3",
     "pytest-cov",
     "ruff",
     "ty",
 ]
+
+[tool.uv.sources]
+promptuna-server = { workspace = true }
+
+# uv workspace ---------------------------------------------------------------
+[tool.uv.workspace]
+members = [".", "server"]
 
 # Build backend ---------------------------------------------------------------
 [build-system]
@@ -44,13 +54,14 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
+"server/projects/*" = ["D"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "tests"]
+pythonpath = ["src", "server/src", "tests"]
 
 [tool.coverage.run]
-source = ["promptuna"]
+source = ["promptuna", "promptuna_server"]
 
 [tool.coverage.report]
 fail_under = 90

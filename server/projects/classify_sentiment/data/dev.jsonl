@@ -1,0 +1,5 @@
+{"inputs": {"review": "Battery lasts two full days and the screen is gorgeous. Best phone I've owned."}, "reference": "positive"}
+{"inputs": {"review": "It works. Setup was fine, nothing surprising, nothing to complain about."}, "reference": "positive"}
+{"inputs": {"review": "Stopped charging after three weeks. Support never replied. Avoid."}, "reference": "negative"}
+{"inputs": {"review": "    Camera   is   AMAZING!!!   colors pop, low-light is great.\n\n\nHighly recommend."}, "reference": "positive"}
+{"inputs": {"review": "Arrived on time. Packaging was a bit beaten up but the product itself looks ok."}, "reference": "neutral"}
