@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.19.0 (2026-06-24)
+
+### Bug Fixes
+
+- **server**: Replay SSE events and include server in coverage gate
+  ([`d52546a`](https://github.com/nachollorca/promptuna/commit/d52546aac0ebf0fe2b7aa35d246c20d76998c27a))
+
+### Features
+
+- **server**: Add FastAPI streaming run/evaluate/optimize API
+  ([`f9ab4ab`](https://github.com/nachollorca/promptuna/commit/f9ab4abde24d9546b1c56a0a5090547e4f7ab6a8))
+
+
 ## v1.18.0 (2026-06-23)
 
 ### Features
