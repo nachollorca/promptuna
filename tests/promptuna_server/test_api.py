@@ -66,6 +66,22 @@ def test_health(client: TestClient):
     assert response.json() == {"status": "ok"}
 
 
+def test_catalog_lists_fixture_project_names(client: TestClient):
+    response = client.get("/catalog")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["projects_root"] == str(FIXTURES.parent.resolve())
+    assert body["projects"] == [
+        {
+            "name": "test_project",
+            "programs": ["echo"],
+            "metrics": ["exact_match"],
+            "prompts": ["baseline"],
+            "datasets": ["dev"],
+        }
+    ]
+
+
 def test_concurrent_job_returns_409(client: TestClient, fake_complete_patch):
     started = threading.Event()
     release = threading.Event()

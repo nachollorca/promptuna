@@ -9,6 +9,23 @@ class JobStartResponse(BaseModel):
     job_id: str
 
 
+class ProjectCatalogResponse(BaseModel):
+    """Name lists for one on-disk project."""
+
+    name: str
+    programs: list[str]
+    metrics: list[str]
+    prompts: list[str]
+    datasets: list[str]
+
+
+class CatalogResponse(BaseModel):
+    """Workspace catalog for building job request selectors."""
+
+    projects_root: str
+    projects: list[ProjectCatalogResponse]
+
+
 class RunRequest(BaseModel):
     """Start a run job over a project-local program and dataset."""
 

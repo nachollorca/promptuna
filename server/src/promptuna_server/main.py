@@ -6,9 +6,16 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from promptuna.projects import ProjectValidationError, build_experiment
+from promptuna.projects import ProjectValidationError, build_catalog, build_experiment
 from promptuna_server import jobs
-from promptuna_server.schemas import EvaluateRequest, JobStartResponse, OptimizeRequest, RunRequest
+from promptuna_server.schemas import (
+    CatalogResponse,
+    EvaluateRequest,
+    JobStartResponse,
+    OptimizeRequest,
+    ProjectCatalogResponse,
+    RunRequest,
+)
 
 app = FastAPI(title="promptuna-server")
 
@@ -32,6 +39,25 @@ def _validation_error(exc: ProjectValidationError) -> HTTPException:
 def health() -> dict[str, str]:
     """Liveness check."""
     return {"status": "ok"}
+
+
+@app.get("/catalog", response_model=CatalogResponse)
+def catalog() -> CatalogResponse:
+    """List project and artifact names under the active projects root."""
+    workspace = build_catalog()
+    return CatalogResponse(
+        projects_root=str(workspace.projects_root),
+        projects=[
+            ProjectCatalogResponse(
+                name=entry.name,
+                programs=entry.programs,
+                metrics=entry.metrics,
+                prompts=entry.prompts,
+                datasets=entry.datasets,
+            )
+            for entry in workspace.projects
+        ],
+    )
 
 
 @app.post("/run", response_model=JobStartResponse)
