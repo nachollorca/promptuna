@@ -8,6 +8,7 @@ import pytest
 
 from promptuna.projects import (
     ProjectValidationError,
+    build_catalog,
     build_experiment,
     default_projects_root,
     get_projects_root,
@@ -161,3 +162,29 @@ def test_build_experiment_without_metrics_returns_none(fixtures_projects_root):
 
     assert len(examples) == 2
     assert metrics is None
+
+
+def test_build_catalog_lists_fixture_project_names(fixtures_projects_root):
+    catalog = build_catalog()
+
+    assert catalog.projects_root == FIXTURES_ROOT.resolve()
+    assert [project.name for project in catalog.projects] == ["test_project"]
+    entry = catalog.projects[0]
+    assert entry.programs == ["echo"]
+    assert entry.metrics == ["exact_match"]
+    assert entry.prompts == ["baseline"]
+    assert entry.datasets == ["dev"]
+
+
+def test_build_catalog_skips_invalid_project_dir_names(tmp_path):
+    (tmp_path / "Valid_Project").mkdir()
+    valid = tmp_path / "valid_project"
+    valid.mkdir()
+    (valid / "prompts").mkdir()
+    (valid / "prompts" / "baseline.jinja").write_text("x", encoding="utf-8")
+    set_projects_root(tmp_path)
+
+    catalog = build_catalog()
+
+    assert [project.name for project in catalog.projects] == ["valid_project"]
+    assert catalog.projects[0].prompts == ["baseline"]

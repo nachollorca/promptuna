@@ -8,6 +8,7 @@ import os
 import re
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,25 @@ _projects_root: Path | None = None
 
 class ProjectValidationError(ValueError):
     """Raised when project resolution or validation fails."""
+
+
+@dataclass(frozen=True)
+class ProjectCatalog:
+    """Name lists for one on-disk project."""
+
+    name: str
+    programs: list[str]
+    metrics: list[str]
+    prompts: list[str]
+    datasets: list[str]
+
+
+@dataclass(frozen=True)
+class WorkspaceCatalog:
+    """Name lists for every project under the active projects root."""
+
+    projects_root: Path
+    projects: list[ProjectCatalog]
 
 
 def default_projects_root() -> Path:
@@ -160,6 +180,72 @@ def resolve_examples(project_dir: Path, examples: str) -> list[Example]:
     if not loaded:
         raise ProjectValidationError(f"dataset {examples!r} is empty")
     return loaded
+
+
+def list_project_names() -> list[str]:
+    """Return valid project directory names under the active projects root."""
+    root = get_projects_root().resolve()
+    if not root.is_dir():
+        return []
+    return sorted(
+        path.name for path in root.iterdir() if path.is_dir() and _NAME_RE.match(path.name)
+    )
+
+
+def list_program_names(project_dir: Path) -> list[str]:
+    """Return public program function names from ``programs.py``."""
+    if not (project_dir / "programs.py").is_file():
+        return []
+    module = _load_project_module(project_dir, "programs")
+    return sorted(
+        name
+        for name, obj in inspect.getmembers(module, inspect.isfunction)
+        if not name.startswith("_") and inspect.getmodule(obj) is module
+    )
+
+
+def list_metric_names(project_dir: Path) -> list[str]:
+    """Return public metric variable names from ``metrics.py``."""
+    if not (project_dir / "metrics.py").is_file():
+        return []
+    module = _load_project_module(project_dir, "metrics")
+    return sorted(
+        name
+        for name, obj in inspect.getmembers(module)
+        if not name.startswith("_") and isinstance(obj, (ProgrammaticMetric, LLMJudgeMetric))
+    )
+
+
+def list_prompt_names(project_dir: Path) -> list[str]:
+    """Return prompt template names from ``prompts/*.jinja``."""
+    prompts_dir = project_dir / "prompts"
+    if not prompts_dir.is_dir():
+        return []
+    return sorted(path.stem for path in prompts_dir.glob("*.jinja") if _NAME_RE.match(path.stem))
+
+
+def list_dataset_names(project_dir: Path) -> list[str]:
+    """Return dataset names from ``data/*.jsonl``."""
+    data_dir = project_dir / "data"
+    if not data_dir.is_dir():
+        return []
+    return sorted(path.stem for path in data_dir.glob("*.jsonl") if _NAME_RE.match(path.stem))
+
+
+def build_catalog() -> WorkspaceCatalog:
+    """List project and artifact names under the active projects root."""
+    root = get_projects_root().resolve()
+    projects = [
+        ProjectCatalog(
+            name=name,
+            programs=list_program_names(root / name),
+            metrics=list_metric_names(root / name),
+            prompts=list_prompt_names(root / name),
+            datasets=list_dataset_names(root / name),
+        )
+        for name in list_project_names()
+    ]
+    return WorkspaceCatalog(projects_root=root, projects=projects)
 
 
 def build_experiment(
