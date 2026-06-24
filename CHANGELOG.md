@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.21.0 (2026-06-24)
+
+### Features
+
+- **server**: Add GET /catalog for workspace artifact discovery
+  ([`4cfed00`](https://github.com/nachollorca/promptuna/commit/4cfed0063ee2dce87daaccb4c600fd6d49729ead))
+
+### Refactoring
+
+- **getting-started**: Load classify_sentiment from samples
+  ([`fd19c85`](https://github.com/nachollorca/promptuna/commit/fd19c850b6f9a4e972326bc421dcb5cde16254a6))
+
+
 ## v1.20.0 (2026-06-24)
 
 ### Chores
