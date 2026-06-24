@@ -237,3 +237,22 @@ def test_optimize_streams_checkpoint_events(client: TestClient, fake_complete_fa
 def test_unknown_job_events_returns_404(client: TestClient):
     response = client.get("/jobs/does-not-exist/events")
     assert response.status_code == 404
+
+
+def test_late_sse_subscriber_replays_completed_job(client: TestClient, fake_complete_patch):
+    start = client.post(
+        "/run",
+        json={
+            "project": "test_project",
+            "program": "echo",
+            "prompt": "baseline",
+            "model": "test:model",
+            "examples": "dev",
+            "workers": 1,
+        },
+    )
+    job_id = start.json()["job_id"]
+    first_events = _wait_for_events(client, job_id)
+
+    second_events = _wait_for_events(client, job_id)
+    assert second_events == first_events

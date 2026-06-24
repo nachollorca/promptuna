@@ -61,7 +61,7 @@ testpaths = ["tests"]
 pythonpath = ["src", "server/src", "tests"]
 
 [tool.coverage.run]
-source = ["promptuna"]
+source = ["promptuna", "promptuna_server"]
 
 [tool.coverage.report]
 fail_under = 90

@@ -9,7 +9,6 @@ import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
-from queue import Queue
 from typing import Any, Literal
 
 from promptuna.evaluate import Metric, stream_experiment
@@ -18,8 +17,8 @@ from promptuna.program import Example, Experiment
 from promptuna.run import stream_run
 from promptuna.serialize import serialize_error, serialize_event
 
-_STREAM_SENTINEL = object()
 JobStatus = Literal["running", "done", "error"]
+_WAIT_TIMEOUT_SECONDS = 1.0
 
 
 class JobKind(StrEnum):
@@ -37,8 +36,9 @@ class JobState:
     job_id: str
     kind: JobKind
     status: JobStatus = "running"
-    queue: Queue[Any] = field(default_factory=Queue)
+    events: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
+    _cond: threading.Condition = field(default_factory=threading.Condition)
 
 
 _jobs: dict[str, JobState] = {}
@@ -47,6 +47,17 @@ _jobs_lock = threading.Lock()
 
 def _has_running_job() -> bool:
     return any(job.status == "running" for job in _jobs.values())
+
+
+def _append_event(job: JobState, envelope: dict[str, Any]) -> None:
+    with job._cond:
+        job.events.append(envelope)
+        job._cond.notify_all()
+
+
+def _finish_job(job: JobState) -> None:
+    with job._cond:
+        job._cond.notify_all()
 
 
 def start_run_job(
@@ -145,7 +156,7 @@ def _job_thread(job: JobState, worker, **kwargs: Any) -> None:
     step_index = 0
     try:
         for envelope in worker(job_id=job.job_id, step_index=step_index, seq=seq, **kwargs):
-            job.queue.put(envelope)
+            _append_event(job, envelope)
             seq = envelope["seq"] + 1
             if envelope["type"] == "step":
                 step_index += 1
@@ -153,11 +164,12 @@ def _job_thread(job: JobState, worker, **kwargs: Any) -> None:
     except Exception as exc:
         job.status = "error"
         job.error = str(exc)
-        job.queue.put(
-            serialize_error(job_id=job.job_id, seq=seq, message=str(exc), step_index=step_index)
+        _append_event(
+            job,
+            serialize_error(job_id=job.job_id, seq=seq, message=str(exc), step_index=step_index),
         )
     finally:
-        job.queue.put(_STREAM_SENTINEL)
+        _finish_job(job)
 
 
 def _run_worker(
@@ -217,14 +229,24 @@ def _optimize_worker(
         seq += 1
 
 
+def _wait_for_events(job: JobState, offset: int) -> tuple[list[dict[str, Any]], bool]:
+    with job._cond:
+        while offset >= len(job.events) and job.status == "running":
+            job._cond.wait(timeout=_WAIT_TIMEOUT_SECONDS)
+        return job.events[offset:], job.status != "running"
+
+
 async def stream_job_events(job_id: str):
     """Async generator yielding SSE ``data:`` lines for ``job_id``."""
     job = get_job(job_id)
+    offset = 0
     while True:
-        item = await asyncio.to_thread(job.queue.get)
-        if item is _STREAM_SENTINEL:
+        batch, done = await asyncio.to_thread(_wait_for_events, job, offset)
+        for envelope in batch:
+            yield f"data: {json.dumps(envelope)}\n\n"
+            offset += 1
+        if done and offset >= len(job.events):
             break
-        yield f"data: {json.dumps(item)}\n\n"
 
 
 def reset_jobs() -> None:
