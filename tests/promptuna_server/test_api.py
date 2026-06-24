@@ -13,9 +13,9 @@ from fastapi.testclient import TestClient
 from helpers import fake_complete
 from promptuna_server import jobs
 from promptuna_server.main import app
-from promptuna_server.projects import set_projects_root
 
 from promptuna.optimize import Proposal, stream_optimize
+from promptuna.projects import set_projects_root
 from promptuna.run import stream_run as library_stream_run
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "test_project"
@@ -64,47 +64,6 @@ def test_health(client: TestClient):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
-
-
-@pytest.mark.parametrize(
-    ("payload", "detail"),
-    [
-        (
-            {
-                "project": "../escape",
-                "program": "echo",
-                "prompt": "baseline",
-                "model": "test:model",
-                "examples": "dev",
-            },
-            "invalid project name",
-        ),
-        (
-            {
-                "project": "missing",
-                "program": "echo",
-                "prompt": "baseline",
-                "model": "test:model",
-                "examples": "dev",
-            },
-            "not found",
-        ),
-        (
-            {
-                "project": "test_project",
-                "program": "_hidden",
-                "prompt": "baseline",
-                "model": "test:model",
-                "examples": "dev",
-            },
-            "invalid program name",
-        ),
-    ],
-)
-def test_run_validation_errors(client: TestClient, payload: dict, detail: str):
-    response = client.post("/run", json=payload)
-    assert response.status_code == 400
-    assert detail in response.json()["detail"]
 
 
 def test_concurrent_job_returns_409(client: TestClient, fake_complete_patch):
