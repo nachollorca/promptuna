@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501
 """Getting started with promptuna.
 
 Walk through a small but realistic example:
@@ -18,12 +18,9 @@ import os
 
 import logfire
 
-from getting_started_program import classify_sentiment
 from promptuna.evaluate import (
     LLMJudgeMetric,
     Ordinal,
-    ProgrammaticMetric,
-    RawScore,
     SuccessfulScoring,
     default_llm_judge,
     run_experiment,
@@ -31,6 +28,13 @@ from promptuna.evaluate import (
 )
 from promptuna.optimize import optimize, render_history
 from promptuna.program import Example, Experiment
+from promptuna.projects import (
+    resolve_examples,
+    resolve_metrics,
+    resolve_program,
+    resolve_project_dir,
+    resolve_prompt_template,
+)
 from promptuna.report import render_run
 from promptuna.run import SuccessfulTrial, run_trial
 
@@ -48,36 +52,8 @@ logfire.configure(
 #
 # We start with a tiny labelled dataset. The `reference` is the ground-truth label.
 
-examples = [
-    Example(
-        inputs={
-            "review": "Battery lasts two full days and the screen is gorgeous. Best phone I've owned."
-        },
-        reference="positive",
-    ),
-    Example(
-        inputs={
-            "review": "It works. Setup was fine, nothing surprising, nothing to complain about."
-        },
-        reference="positive",
-    ),
-    Example(
-        inputs={"review": "Stopped charging after three weeks. Support never replied. Avoid."},
-        reference="negative",
-    ),
-    Example(
-        inputs={
-            "review": "    Camera   is   AMAZING!!!   colors pop, low-light is great.\n\n\nHighly recommend."
-        },
-        reference="positive",
-    ),
-    Example(
-        inputs={
-            "review": "Arrived on time. Packaging was a bit beaten up but the product itself looks ok."
-        },
-        reference="neutral",
-    ),
-]
+project_dir = resolve_project_dir("classify_sentiment")
+examples = resolve_examples(project_dir, "dev")
 
 # ## Target Function
 # Now we define the program — the thing we actually want to evaluate.
@@ -91,20 +67,16 @@ examples = [
 # The function must adhere to the Program protocol: take its named inputs, the prompt template,
 # and a model id, then return whatever the downstream scorers should consume. The harness unpacks
 # Example.inputs as keyword arguments, so the parameter names must match the dict keys.
-# The program and its output schema live in getting_started_program.py so the optimizer
-# can introspect them (see that module's docstring).
+# The program and its output schema live in samples/classify_sentiment/programs.py so the
+# optimizer can introspect them.
+
+classify_sentiment = resolve_program(project_dir, "v1")
 
 # ## Knobs
 # Now, lets define the moving parts under test. The two sweepable axes are the prompt template
 # and the model.
 
-prompt_template = """Your task is to classify the sentiment of this product review:
-
-{{ REVIEW }}
-
-The possible labels are 'positive', 'neutral' and 'negative'
-"""
-
+prompt_template = resolve_prompt_template(project_dir, "baseline")
 model = "mistral:mistral-small-latest"
 
 # ## Trial
@@ -127,26 +99,10 @@ print("Trial output:", trial.output)
 # ### Programmatic Metrics
 # First, a simple deterministic check: does the predicted label match the ground truth? No LLM
 # judge needed — a ProgrammaticMetric whose scorer follows the ProgrammaticScorer protocol is the
-# right artifact. We declare the value space with an Ordinal scale.
+# right artifact. We declare the value space with an Ordinal scale. See
+# samples/classify_sentiment/metrics.py for the full definition.
 
-
-def label_match(output: dict, example: Example) -> RawScore:
-    predicted = output["sentiment"]
-    expected = example.reference
-    if predicted == expected:
-        return RawScore(raw=True, reason=f"Predicted '{predicted}' matches reference.")
-    return RawScore(
-        raw=False,
-        reason=f"Predicted '{predicted}', expected '{expected}'.",
-    )
-
-
-label_correctness = ProgrammaticMetric(
-    name="label_correctness",
-    description="Whether the predicted sentiment label matches the ground-truth label.",
-    scale=Ordinal(levels=[False, True]),
-    scorer=label_match,
-)
+label_correctness = resolve_metrics(project_dir, ["label_correctness"])[0]
 
 # Now we score the trial against the metric.
 
