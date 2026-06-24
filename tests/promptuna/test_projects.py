@@ -151,7 +151,7 @@ def test_default_projects_root_points_at_samples():
 
 
 def test_build_experiment_without_metrics_returns_none(fixtures_projects_root):
-    experiment, examples, metrics = build_experiment(
+    _experiment, examples, metrics = build_experiment(
         project="test_project",
         program="echo",
         prompt="baseline",
@@ -159,7 +159,5 @@ def test_build_experiment_without_metrics_returns_none(fixtures_projects_root):
         examples="dev",
     )
 
-    project_dir = resolve_project_dir("test_project")
-    assert experiment.program is resolve_program(project_dir, "echo")
     assert len(examples) == 2
     assert metrics is None

@@ -1383,10 +1383,15 @@ wheels = [
 
 [[package]]
 name = "promptuna"
-version = "1.18.0"
+version = "1.19.0"
 source = { editable = "." }
 dependencies = [
     { name = "lmdk" },
+]
+
+[package.optional-dependencies]
+cli = [
+    { name = "typer" },
 ]
 
 [package.dev-dependencies]
@@ -1406,7 +1411,11 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "lmdk", specifier = ">=1.8.0" }]
+requires-dist = [
+    { name = "lmdk", specifier = ">=1.8.0" },
+    { name = "typer", marker = "extra == 'cli'", specifier = ">=0.12" },
+]
+provides-extras = ["cli"]
 
 [package.metadata.requires-dev]
 dev = [
