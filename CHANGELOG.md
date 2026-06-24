@@ -2,6 +2,42 @@
 
 <!-- version list -->
 
+## v1.20.0 (2026-06-24)
+
+### Chores
+
+- Scaffold optional cli extra and future surface placeholders
+  ([`eb4453d`](https://github.com/nachollorca/promptuna/commit/eb4453d56ad42ab6e7a7333142a999098df11963))
+
+### Continuous Integration
+
+- Ignore spec plans
+  ([`a8e66d3`](https://github.com/nachollorca/promptuna/commit/a8e66d36c2fd34a15c3174bbdb48cdcd9c01f12d))
+
+### Documentation
+
+- Document usage surfaces and planned agent/server workflows
+  ([`43ac095`](https://github.com/nachollorca/promptuna/commit/43ac095dab79cb30b77958d0ac705a8d190dfd2e))
+
+### Features
+
+- Support PROMPTUNA_PROJECTS_ROOT for project discovery
+  ([`de1fd04`](https://github.com/nachollorca/promptuna/commit/de1fd04f64b5a0cdb722d03d1dc954bd534e7e37))
+
+### Refactoring
+
+- Extract on-disk project loader into promptuna.projects
+  ([`d4947cb`](https://github.com/nachollorca/promptuna/commit/d4947cb3219231461be680c4b3c9497a3881f5a7))
+
+- Move reference project from server/projects to samples/
+  ([`32ffd64`](https://github.com/nachollorca/promptuna/commit/32ffd64ec23623ca10703d2585945d26910e88d4))
+
+### Testing
+
+- Add unit tests for promptuna.projects loader
+  ([`35f6b03`](https://github.com/nachollorca/promptuna/commit/35f6b034b8c483ed69c3daac8423ba9df76ae4b2))
+
+
 ## v1.19.0 (2026-06-24)
 
 ### Bug Fixes
