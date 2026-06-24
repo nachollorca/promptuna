@@ -1,6 +1,6 @@
 # Sample projects
 
-Bundled reference projects for development and documentation. Each subdirectory is a **project** the workspace loader can resolve by name.
+Bundled reference projects for development and documentation. Each subdirectory is a **project** the project loader can resolve by name.
 
 This is not where end-user projects live in production — a future `promptuna init` will scaffold a workspace elsewhere. These samples ship with the repo so contributors have a working example to copy.
 

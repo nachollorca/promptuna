@@ -6,8 +6,8 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from promptuna.projects import ProjectValidationError, build_experiment
 from promptuna_server import jobs
-from promptuna_server.projects import ProjectValidationError, build_experiment
 from promptuna_server.schemas import EvaluateRequest, JobStartResponse, OptimizeRequest, RunRequest
 
 app = FastAPI(title="promptuna-server")

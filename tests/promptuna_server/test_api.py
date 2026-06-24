@@ -13,9 +13,9 @@ from fastapi.testclient import TestClient
 from helpers import fake_complete
 from promptuna_server import jobs
 from promptuna_server.main import app
-from promptuna_server.projects import set_projects_root
 
 from promptuna.optimize import Proposal, stream_optimize
+from promptuna.projects import set_projects_root
 from promptuna.run import stream_run as library_stream_run
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "test_project"

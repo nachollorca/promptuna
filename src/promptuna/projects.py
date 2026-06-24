@@ -1,4 +1,4 @@
-"""Resolve project paths, import modules, and validate request selections."""
+"""Resolve on-disk project layouts into live :class:`~promptuna.program.Experiment` objects."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any
 
 from promptuna.evaluate import LLMJudgeMetric, Metric, ProgrammaticMetric
 from promptuna.load import load_jsonl
-from promptuna.program import Experiment, Program
+from promptuna.program import Example, Experiment, Program
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _projects_root: Path | None = None
@@ -23,8 +23,8 @@ class ProjectValidationError(ValueError):
 
 
 def default_projects_root() -> Path:
-    """Return the bundled ``projects/`` directory next to the server package."""
-    return Path(__file__).resolve().parent.parent.parent / "projects"
+    """Return the bundled ``samples/`` directory at the repository root."""
+    return Path(__file__).resolve().parent.parent.parent / "samples"
 
 
 def get_projects_root() -> Path:
@@ -51,7 +51,7 @@ def _resolve_under_root(root: Path, *parts: str) -> Path:
 
 
 def resolve_project_dir(project: str) -> Path:
-    """Return ``projects/<project>/`` after validating the project name."""
+    """Return ``<projects_root>/<project>/`` after validating the project name."""
     _validate_name(project, kind="project")
     root = get_projects_root().resolve()
     project_dir = _resolve_under_root(root, project)
@@ -135,7 +135,7 @@ def resolve_prompt_template(project_dir: Path, prompt: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def resolve_examples(project_dir: Path, examples: str) -> list:
+def resolve_examples(project_dir: Path, examples: str) -> list[Example]:
     """Load ``data/<examples>.jsonl`` via :func:`promptuna.load.load_jsonl`."""
     _validate_name(examples, kind="examples")
     path = _resolve_under_root(project_dir, "data", f"{examples}.jsonl")
@@ -155,7 +155,7 @@ def build_experiment(
     model: str,
     examples: str,
     metrics: list[str] | None = None,
-) -> tuple[Experiment, list, list[Metric] | None]:
+) -> tuple[Experiment, list[Example], list[Metric] | None]:
     """Validate project selections and build an :class:`Experiment` plus dataset."""
     project_dir = resolve_project_dir(project)
     resolved_program = resolve_program(project_dir, program)
