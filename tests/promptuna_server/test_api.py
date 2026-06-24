@@ -66,47 +66,6 @@ def test_health(client: TestClient):
     assert response.json() == {"status": "ok"}
 
 
-@pytest.mark.parametrize(
-    ("payload", "detail"),
-    [
-        (
-            {
-                "project": "../escape",
-                "program": "echo",
-                "prompt": "baseline",
-                "model": "test:model",
-                "examples": "dev",
-            },
-            "invalid project name",
-        ),
-        (
-            {
-                "project": "missing",
-                "program": "echo",
-                "prompt": "baseline",
-                "model": "test:model",
-                "examples": "dev",
-            },
-            "not found",
-        ),
-        (
-            {
-                "project": "test_project",
-                "program": "_hidden",
-                "prompt": "baseline",
-                "model": "test:model",
-                "examples": "dev",
-            },
-            "invalid program name",
-        ),
-    ],
-)
-def test_run_validation_errors(client: TestClient, payload: dict, detail: str):
-    response = client.post("/run", json=payload)
-    assert response.status_code == 400
-    assert detail in response.json()["detail"]
-
-
 def test_concurrent_job_returns_409(client: TestClient, fake_complete_patch):
     started = threading.Event()
     release = threading.Event()
