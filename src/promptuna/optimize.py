@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 
 from promptuna.evaluate import Metric, RunInfo, RunResults, Scoring, stream_evaluate
 from promptuna.program import Example, Experiment
-from promptuna.report import fence_verbatim, render_run
+from promptuna.report import render_history
 from promptuna.run import FailedTrial, SuccessfulTrial, Trial
 
 logger = logging.getLogger(__name__)
@@ -366,35 +366,6 @@ def optimize(
     return OptimizationResult(steps=archive)
 
 
-def _signed(delta: float) -> str:
-    """Format a score delta with an explicit sign, e.g. ``+0.09`` / ``-0.01``."""
-    return f"{delta:+.2f}"
-
-
-def _render_step_heading(step: Step, index: int, baseline_score: float, is_best: bool) -> str:
-    """Build the per-step ``##`` heading for :func:`render_history`."""
-    role = "baseline" if index == 0 else "candidate"
-    parts = [f"## Step {index} — {role} · score {step.score:.2f}"]
-    if index > 0:
-        parts.append(f"Δ {_signed(step.score - baseline_score)} vs baseline")
-    if is_best:
-        parts.append("⭐ best")
-    return " · ".join(parts)
-
-
-def _render_step_intent(thinking: Thinking) -> str:
-    """Compact rationale for a proposed step (hypothesis + edit plan)."""
-    return "\n\n".join(
-        [
-            "### Intent",
-            "",
-            f"**Hypothesis:** {thinking.improvement_hypothesis}",
-            "",
-            f"**Edit plan:** {thinking.edit_plan}",
-        ]
-    )
-
-
 def _render_full_thinking(thinking: Thinking) -> str:
     """Render every field from a structured reasoning block."""
     labels = {
@@ -420,40 +391,3 @@ def render_prior_rationale(steps: list[Step]) -> str:
     if thinking is None:
         return ""
     return _render_full_thinking(thinking)
-
-
-def render_history(steps: list[Step]) -> str:
-    """Render the trajectory for the proposer's ``HISTORY`` context.
-
-    Returns:
-        Human-readable string; empty input yields ``""``.
-    """
-    if not steps:
-        return ""
-
-    baseline_score = steps[0].score
-    best_index = max(range(len(steps)), key=lambda i: steps[i].score)
-    # Error analysis only earns its keep on the checkpoints the proposer is asked
-    # to act on: the best one it may refine and the latest one it just tried, both
-    # with rendered prompts. Superseded candidates omit it entirely — their score
-    # delta and template already carry the signal, and stale per-example detail
-    # just bloats the trajectory. ``best`` and ``last`` collapse when they coincide.
-    detailed = {best_index, len(steps) - 1}
-
-    step_blocks: list[str] = []
-    for i, step in enumerate(steps):
-        error_format = "rendered" if i in detailed else None
-        sections = [_render_step_heading(step, i, baseline_score, is_best=i == best_index)]
-        if i > 0 and step.thinking is not None:
-            sections.append(_render_step_intent(step.thinking))
-        sections.extend(
-            [
-                "### Template",
-                "",
-                fence_verbatim("template", step.prompt_template),
-                render_run(step.result, telemetry=False, error_format=error_format),
-            ]
-        )
-        step_blocks.append("\n\n".join(sections))
-
-    return "\n\n---\n\n".join(step_blocks)
