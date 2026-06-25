@@ -17,6 +17,7 @@ from promptuna.jobs import (
     list_job_ids,
     load_job,
     sha256_file,
+    stream_job,
 )
 from promptuna.optimize import Step, Thinking
 from promptuna.projects import set_projects_root
@@ -168,3 +169,100 @@ def test_finalize_error_job(workspace_root: Path, job_config: JobConfig):
     assert record.manifest["status"] == "error"
     assert summary["status"] == "error"
     assert summary["error"] == "worker crashed"
+
+
+def test_stream_job_persists_and_yields_envelopes(
+    workspace_root: Path,
+    job_config: JobConfig,
+    example,
+    exact_match_metric,
+):
+    archive = JobArchive.open(get_jobs_root(), "job-stream", job_config)
+    trial = make_trial(example, output="4")
+    scoring = SuccessfulScoring(
+        trial=trial,
+        metric=exact_match_metric,
+        score=Score(raw=1.0, normalized=1.0, reason="exact"),
+    )
+
+    def source():
+        yield trial
+        yield scoring
+
+    envelopes = list(stream_job(archive, source()))
+
+    assert len(envelopes) == 2
+    assert envelopes[0]["type"] == "trial"
+    assert envelopes[1]["type"] == "scoring"
+
+    record = load_job(get_jobs_root(), "job-stream")
+    assert record.manifest["status"] == "done"
+    assert record.events == envelopes
+    assert record.summary is not None
+
+
+def test_stream_job_records_errors(workspace_root: Path, job_config: JobConfig, example):
+    archive = JobArchive.open(get_jobs_root(), "job-error", job_config)
+
+    def source():
+        yield make_trial(example, output="4")
+        raise RuntimeError("worker crashed")
+
+    with pytest.raises(RuntimeError, match="worker crashed"):
+        list(stream_job(archive, source()))
+
+    record = load_job(get_jobs_root(), "job-error")
+    assert record.manifest["status"] == "error"
+    assert record.manifest["error"] == "worker crashed"
+    assert record.events[-1]["type"] == "error"
+    assert record.summary is not None
+    assert record.summary["status"] == "error"
+
+
+def test_stream_job_advances_optimize_step_index(
+    workspace_root: Path,
+    job_config: JobConfig,
+    experiment,
+    examples,
+    exact_match_metric,
+):
+    job_config = JobConfig(
+        kind="optimize",
+        projects_root=job_config.projects_root,
+        project=job_config.project,
+        program=job_config.program,
+        prompt=job_config.prompt,
+        examples=job_config.examples,
+        dataset_path=job_config.dataset_path,
+        model=job_config.model,
+        workers=job_config.workers,
+        metrics=job_config.metrics,
+        steps=1,
+        proposer_model="test:model",
+    )
+    archive = JobArchive.open(get_jobs_root(), "job-optimize", job_config)
+    result = make_run_results(experiment, examples[:1], exact_match_metric, scores=[0.5])
+    step = Step(
+        prompt_template="Better: {{ question }}",
+        result=result,
+        thinking=Thinking(
+            reinstate_goal="g",
+            trajectory_summary="s",
+            failure_analysis="f",
+            what_works="w",
+            what_hurts="h",
+            improvement_hypothesis="i",
+            edit_plan="e",
+        ),
+    )
+    trial = make_trial(examples[0], output="4")
+
+    def source():
+        yield trial
+        yield step
+
+    envelopes = list(stream_job(archive, source()))
+
+    assert envelopes[0]["step_index"] == 0
+    assert envelopes[1]["type"] == "step"
+    assert envelopes[1]["step_index"] == 0

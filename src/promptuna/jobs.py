@@ -8,8 +8,8 @@ Server and CLI surfaces write under the active projects workspace:
 ``<projects_root>/jobs/<job_id>/summary.json`` — denormalized rollup written when the job
 finishes.
 
-The library surface (plain Python imports, no on-disk project layout) will use
-``<cwd>/.promptuna_jobs/`` instead — see :func:`get_library_jobs_root`.
+The library surface (plain Python imports, no on-disk project layout) can opt in via
+:func:`stream_job` and :func:`get_library_jobs_root` (``<cwd>/.promptuna_jobs/``).
 
 Job directories are optimized for durable read-back and reporting, not perfect re-execution.
 """
@@ -18,13 +18,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Literal
 
+from promptuna.evaluate import Scoring
+from promptuna.optimize import Step
 from promptuna.projects import get_projects_root
+from promptuna.run import Trial
+from promptuna.serialize import serialize_error, serialize_event
 
 SCHEMA_VERSION = 1
 _MANIFEST_NAME = "manifest.json"
@@ -43,8 +48,51 @@ def get_jobs_root() -> Path:
 
 
 def get_library_jobs_root() -> Path:
-    """Return ``<cwd>/.promptuna_jobs`` for library-surface jobs (not wired yet)."""
+    """Return ``<cwd>/.promptuna_jobs`` for library-surface jobs."""
     return Path.cwd() / LIBRARY_JOBS_DIR
+
+
+def stream_job(
+    archive: JobArchive,
+    source: Iterator[Trial | Scoring | Step],
+) -> Iterator[dict[str, Any]]:
+    """Persist one streaming job and yield serialized event envelopes.
+
+    Each item from ``source`` is wrapped via :func:`~promptuna.serialize.serialize_event`,
+    appended to ``archive``, and yielded. On normal completion the archive is finalized
+    with status ``done``. On failure an error envelope is appended, the archive is
+    finalized with status ``error``, the error envelope is yielded, and the exception
+    is re-raised.
+
+    Workspace surfaces (server, CLI) call this by default. Library users opt in by
+    opening a :class:`JobArchive` (often under :func:`get_library_jobs_root`) and
+    passing a core stream such as :func:`~promptuna.run.stream_run`.
+    """
+    job_id = archive.job_id
+    seq = 0
+    step_index = 0
+    try:
+        for item in source:
+            if isinstance(item, Step):
+                envelope = serialize_event(item, job_id=job_id, seq=seq, step_index=step_index)
+                step_index += 1
+            else:
+                envelope = serialize_event(item, job_id=job_id, seq=seq, step_index=step_index)
+            archive.append_event(envelope)
+            yield envelope
+            seq += 1
+        archive.finalize("done")
+    except Exception as exc:
+        error_envelope = serialize_error(
+            job_id=job_id,
+            seq=seq,
+            message=str(exc),
+            step_index=step_index,
+        )
+        archive.append_event(error_envelope)
+        archive.finalize("error", error=str(exc))
+        yield error_envelope
+        raise
 
 
 def sha256_file(path: Path) -> str:
