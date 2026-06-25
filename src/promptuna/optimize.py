@@ -1,6 +1,6 @@
 """Prompt-template optimization.
 
-Closes the loop around :func:`promptuna.evaluate.run_experiment`: given a fixed
+Closes the loop around :func:`promptuna.evaluate.evaluate`: given a fixed
 model and a set of metrics, search for a prompt template that scores better
 on a flat ``list[Example]``.
 
@@ -332,7 +332,7 @@ def optimize(
 ) -> OptimizationResult:
     """Search for a higher-scoring prompt template on ``examples``.
 
-    Same contract as :func:`promptuna.evaluate.run_experiment` (no train/test
+    Same contract as :func:`promptuna.evaluate.evaluate` (no train/test
     split — holdout evaluation is the caller's responsibility). See the module
     docstring for loop details.
 
@@ -346,7 +346,7 @@ def optimize(
         proposer_model: Model for the proposer.
         steps: Candidates to propose beyond the baseline (``>= 0``).
         proposer: Candidate generator; defaults to :func:`default_proposer`.
-        workers: Thread-pool size per ``run_experiment`` call.
+        workers: Thread-pool size per :func:`~promptuna.evaluate.evaluate` call.
 
     Returns:
         Chronological archive; see :attr:`OptimizationResult.best`.

@@ -2,7 +2,7 @@
 
 Two entry points:
 
-- :func:`run_experiment` blocks and returns a fully-populated :class:`RunResults`.
+- :func:`evaluate` blocks and returns a fully-populated :class:`RunResults`.
 - :func:`stream_evaluate` yields :class:`Trial` and :class:`Scoring` items
   as soon as they are ready, so callers can render progress or persist
   partial results and survive mid-run crashes.
@@ -486,7 +486,7 @@ def default_llm_judge(
 # ---------------------------------------------------------------------------
 
 
-def run_experiment(
+def evaluate(
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
