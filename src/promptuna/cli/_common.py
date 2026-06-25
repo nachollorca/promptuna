@@ -12,10 +12,10 @@ import typer
 
 from promptuna.evaluate import RunInfo, RunResults, Scoring
 from promptuna.jobs import JobArchive, JobConfig, JobKind, get_jobs_root, load_job, stream_job
-from promptuna.optimize import Step, render_history
+from promptuna.optimize import Step
 from promptuna.program import Experiment
 from promptuna.projects import ProjectValidationError, set_projects_root
-from promptuna.report import render_run
+from promptuna.report import render_history, render_run
 from promptuna.run import FailedTrial, SuccessfulTrial
 
 OutputFormat = Literal["human", "json"]

@@ -26,7 +26,7 @@ from promptuna.evaluate import (
     evaluate,
     score_metric,
 )
-from promptuna.optimize import optimize, render_history
+from promptuna.optimize import optimize
 from promptuna.program import Example, Experiment
 from promptuna.projects import (
     resolve_examples,
@@ -35,7 +35,7 @@ from promptuna.projects import (
     resolve_project_dir,
     resolve_prompt_template,
 )
-from promptuna.report import render_run
+from promptuna.report import render_history, render_run
 from promptuna.run import SuccessfulTrial, run_trial
 
 # configure a simple exporter for the telemetry traces.
