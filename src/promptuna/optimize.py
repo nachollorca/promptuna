@@ -1,6 +1,6 @@
 """Prompt-template optimization.
 
-Closes the loop around :func:`promptuna.evaluate.run_experiment`: given a fixed
+Closes the loop around :func:`promptuna.evaluate.evaluate`: given a fixed
 model and a set of metrics, search for a prompt template that scores better
 on a flat ``list[Example]``.
 
@@ -27,7 +27,7 @@ from typing import Protocol
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
 
-from promptuna.evaluate import Metric, RunInfo, RunResults, Scoring, stream_experiment
+from promptuna.evaluate import Metric, RunInfo, RunResults, Scoring, stream_evaluate
 from promptuna.program import Example, Experiment
 from promptuna.report import fence_verbatim, render_run
 from promptuna.run import FailedTrial, SuccessfulTrial, Trial
@@ -233,7 +233,7 @@ def _stream_step(
     """Evaluate one checkpoint, yielding trials and scorings then the aggregated step."""
     trials: list[Trial] = []
     scorings: list[Scoring] = []
-    for item in stream_experiment(experiment, examples, metrics, workers=workers):
+    for item in stream_evaluate(experiment, examples, metrics, workers=workers):
         if isinstance(item, (SuccessfulTrial, FailedTrial)):
             trials.append(item)
         else:
@@ -273,7 +273,7 @@ def stream_optimize(
 
     1. Items for a step are contiguous: all of its trials and scorings, then
        exactly one :class:`Step`.
-    2. Within a step, trial/scoring order matches :func:`stream_experiment`
+    2. Within a step, trial/scoring order matches :func:`stream_evaluate`
        (completion order; each trial before its scorings).
     3. Between steps the proposer runs synchronously and emits nothing.
     4. The stream ends after the last :class:`Step` (early stop when a
@@ -332,7 +332,7 @@ def optimize(
 ) -> OptimizationResult:
     """Search for a higher-scoring prompt template on ``examples``.
 
-    Same contract as :func:`promptuna.evaluate.run_experiment` (no train/test
+    Same contract as :func:`promptuna.evaluate.evaluate` (no train/test
     split — holdout evaluation is the caller's responsibility). See the module
     docstring for loop details.
 
@@ -346,7 +346,7 @@ def optimize(
         proposer_model: Model for the proposer.
         steps: Candidates to propose beyond the baseline (``>= 0``).
         proposer: Candidate generator; defaults to :func:`default_proposer`.
-        workers: Thread-pool size per ``run_experiment`` call.
+        workers: Thread-pool size per :func:`~promptuna.evaluate.evaluate` call.
 
     Returns:
         Chronological archive; see :attr:`OptimizationResult.best`.

@@ -1,9 +1,10 @@
 """Serialize streaming job events to JSON-safe envelopes.
 
 Each yielded ``Trial``, ``Scoring``, or ``Step`` is wrapped in a stable envelope
-suitable for SSE transport and unit tests. Fatal job failures use
-:func:`serialize_error`. Callers assign ``seq`` and ``step_index`` as events are
-emitted. ``step`` events appear only on optimize jobs.
+suitable for SSE transport, on-disk job persistence (:mod:`promptuna.jobs`), and
+unit tests. Fatal job failures use :func:`serialize_error`. Callers assign ``seq``
+and ``step_index`` as events are emitted. ``step`` events appear only on optimize
+jobs.
 """
 
 import hashlib

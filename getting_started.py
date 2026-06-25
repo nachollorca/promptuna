@@ -23,7 +23,7 @@ from promptuna.evaluate import (
     Ordinal,
     SuccessfulScoring,
     default_llm_judge,
-    run_experiment,
+    evaluate,
     score_metric,
 )
 from promptuna.optimize import optimize, render_history
@@ -143,7 +143,7 @@ experiment = Experiment(
     model=model,
 )
 
-results = run_experiment(
+results = evaluate(
     experiment=experiment,
     examples=examples,
     metrics=[label_correctness, reason_quality],

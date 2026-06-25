@@ -1,4 +1,4 @@
-"""Job lifecycle: background threads, queues, and SSE event bridging."""
+"""Job lifecycle: background threads, queues, SSE event bridging, and on-disk jobs."""
 
 from __future__ import annotations
 
@@ -6,27 +6,19 @@ import asyncio
 import json
 import threading
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
-from promptuna.evaluate import Metric, stream_experiment
+from promptuna.evaluate import Metric, Scoring, stream_evaluate
+from promptuna.jobs import JobArchive, JobConfig, JobKind, JobStatus, get_jobs_root, stream_job
 from promptuna.optimize import Step, stream_optimize
 from promptuna.program import Example, Experiment
-from promptuna.run import stream_run
-from promptuna.serialize import serialize_error, serialize_event
+from promptuna.run import Trial, stream_run
 
-JobStatus = Literal["running", "done", "error"]
 _WAIT_TIMEOUT_SECONDS = 1.0
 
-
-class JobKind(StrEnum):
-    """Discriminator for which library stream drives a job."""
-
-    RUN = "run"
-    EVALUATE = "evaluate"
-    OPTIMIZE = "optimize"
+StreamSource = Callable[[], Iterator[Trial | Scoring | Step]]
 
 
 @dataclass
@@ -35,6 +27,7 @@ class JobState:
 
     job_id: str
     kind: JobKind
+    archive: JobArchive
     status: JobStatus = "running"
     events: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
@@ -62,22 +55,22 @@ def _finish_job(job: JobState) -> None:
 
 def start_run_job(
     *,
+    config: JobConfig,
     experiment: Experiment,
     examples: list[Example],
     workers: int,
 ) -> str:
     """Start a run job and return its ``job_id``."""
     return _start_job(
-        JobKind.RUN,
-        _run_worker,
-        experiment=experiment,
-        examples=examples,
-        workers=workers,
+        "run",
+        lambda: stream_run(experiment, examples, workers=workers),
+        config=config,
     )
 
 
 def start_evaluate_job(
     *,
+    config: JobConfig,
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
@@ -85,17 +78,15 @@ def start_evaluate_job(
 ) -> str:
     """Start an evaluate job and return its ``job_id``."""
     return _start_job(
-        JobKind.EVALUATE,
-        _evaluate_worker,
-        experiment=experiment,
-        examples=examples,
-        metrics=metrics,
-        workers=workers,
+        "evaluate",
+        lambda: stream_evaluate(experiment, examples, metrics, workers=workers),
+        config=config,
     )
 
 
 def start_optimize_job(
     *,
+    config: JobConfig,
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
@@ -105,31 +96,33 @@ def start_optimize_job(
 ) -> str:
     """Start an optimize job and return its ``job_id``."""
     return _start_job(
-        JobKind.OPTIMIZE,
-        _optimize_worker,
-        experiment=experiment,
-        examples=examples,
-        metrics=metrics,
-        workers=workers,
-        steps=steps,
-        proposer_model=proposer_model,
+        "optimize",
+        lambda: stream_optimize(
+            experiment,
+            examples,
+            metrics,
+            proposer_model=proposer_model,
+            steps=steps,
+            workers=workers,
+        ),
+        config=config,
     )
 
 
-def _start_job(kind: JobKind, worker, **kwargs: Any) -> str:
+def _start_job(kind: JobKind, build_source: StreamSource, *, config: JobConfig) -> str:
     with _jobs_lock:
         if _has_running_job():
             raise ConflictError("another job is already running")
         job_id = str(uuid.uuid4())
-        job = JobState(job_id=job_id, kind=kind)
+        archive = JobArchive.open(get_jobs_root(), job_id, config)
+        job = JobState(job_id=job_id, kind=kind, archive=archive)
         _jobs[job_id] = job
 
     thread = threading.Thread(
         target=_job_thread,
-        args=(job, worker),
-        kwargs=kwargs,
+        args=(job, build_source),
         daemon=True,
-        name=f"promptuna-{kind.value}-{job_id[:8]}",
+        name=f"promptuna-{kind}-{job_id[:8]}",
     )
     thread.start()
     return job_id
@@ -151,89 +144,16 @@ def get_job(job_id: str) -> JobState:
         raise JobNotFoundError(job_id) from exc
 
 
-def _job_thread(job: JobState, worker, **kwargs: Any) -> None:
-    seq = 0
-    step_index = 0
+def _job_thread(job: JobState, build_source: StreamSource) -> None:
     try:
-        for envelope in worker(job_id=job.job_id, step_index=step_index, seq=seq, **kwargs):
+        for envelope in stream_job(job.archive, build_source()):
             _append_event(job, envelope)
-            seq = envelope["seq"] + 1
-            if envelope["type"] == "step":
-                step_index += 1
         job.status = "done"
     except Exception as exc:
         job.status = "error"
         job.error = str(exc)
-        _append_event(
-            job,
-            serialize_error(job_id=job.job_id, seq=seq, message=str(exc), step_index=step_index),
-        )
     finally:
         _finish_job(job)
-
-
-def _run_worker(
-    *,
-    job_id: str,
-    experiment: Experiment,
-    examples: list[Example],
-    workers: int,
-    seq: int,
-    step_index: int,
-) -> Iterator[dict[str, Any]]:
-    for item in stream_run(experiment, examples, workers=workers):
-        yield serialize_event(item, job_id=job_id, seq=seq, step_index=0)
-        seq += 1
-
-
-def _evaluate_worker(
-    *,
-    job_id: str,
-    experiment: Experiment,
-    examples: list[Example],
-    metrics: list[Metric],
-    workers: int,
-    seq: int,
-    step_index: int,
-) -> Iterator[dict[str, Any]]:
-    for item in stream_experiment(experiment, examples, metrics, workers=workers):
-        yield serialize_event(item, job_id=job_id, seq=seq, step_index=0)
-        seq += 1
-
-
-def _optimize_worker(
-    *,
-    job_id: str,
-    experiment: Experiment,
-    examples: list[Example],
-    metrics: list[Metric],
-    workers: int,
-    steps: int,
-    proposer_model: str,
-    seq: int,
-    step_index: int,
-) -> Iterator[dict[str, Any]]:
-    for item in stream_optimize(
-        experiment,
-        examples,
-        metrics,
-        proposer_model=proposer_model,
-        steps=steps,
-        workers=workers,
-    ):
-        if isinstance(item, Step):
-            yield serialize_event(item, job_id=job_id, seq=seq, step_index=step_index)
-            step_index += 1
-        else:
-            yield serialize_event(item, job_id=job_id, seq=seq, step_index=step_index)
-        seq += 1
-
-
-def _wait_for_events(job: JobState, offset: int) -> tuple[list[dict[str, Any]], bool]:
-    with job._cond:
-        while offset >= len(job.events) and job.status == "running":
-            job._cond.wait(timeout=_WAIT_TIMEOUT_SECONDS)
-        return job.events[offset:], job.status != "running"
 
 
 async def stream_job_events(job_id: str):
@@ -247,6 +167,13 @@ async def stream_job_events(job_id: str):
             offset += 1
         if done and offset >= len(job.events):
             break
+
+
+def _wait_for_events(job: JobState, offset: int) -> tuple[list[dict[str, Any]], bool]:
+    with job._cond:
+        while offset >= len(job.events) and job.status == "running":
+            job._cond.wait(timeout=_WAIT_TIMEOUT_SECONDS)
+        return job.events[offset:], job.status != "running"
 
 
 def reset_jobs() -> None:

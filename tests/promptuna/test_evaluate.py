@@ -26,9 +26,9 @@ from promptuna.evaluate import (
     SuccessfulScoring,
     _aggregate,
     default_llm_judge,
-    run_experiment,
+    evaluate,
     score_metric,
-    stream_experiment,
+    stream_evaluate,
 )
 from promptuna.program import Example
 from promptuna.run import FailedTrial, SuccessfulTrial, run_trial
@@ -207,7 +207,7 @@ def test_run_results_telemetry_is_zero_without_successful_responses(
         ({"examples": [Example(inputs={"q": "1"})], "metrics": []}, "no metrics provided"),
     ],
 )
-def test_run_experiment_rejects_invalid_input(experiment, kwargs, match):
+def test_evaluate_rejects_invalid_input(experiment, kwargs, match):
     metrics: list[Metric] = kwargs.pop("metrics")
     if metrics == [object()]:
         metrics = [
@@ -219,10 +219,10 @@ def test_run_experiment_rejects_invalid_input(experiment, kwargs, match):
             )
         ]
     with pytest.raises(ValueError, match=match):
-        run_experiment(experiment, kwargs["examples"], metrics)
+        evaluate(experiment, kwargs["examples"], metrics)
 
 
-def test_run_experiment_rejects_duplicate_metric_names(experiment, examples):
+def test_evaluate_rejects_duplicate_metric_names(experiment, examples):
     metric = ProgrammaticMetric(
         name="dup",
         description="d",
@@ -230,25 +230,25 @@ def test_run_experiment_rejects_duplicate_metric_names(experiment, examples):
         scorer=lambda output, example: RawScore(raw=1.0),
     )
     with pytest.raises(ValueError, match="unique"):
-        run_experiment(experiment, examples, [metric, metric])
+        evaluate(experiment, examples, [metric, metric])
 
 
-def test_run_experiment_rejects_empty_prompt_template(experiment, examples, exact_match_metric):
+def test_evaluate_rejects_empty_prompt_template(experiment, examples, exact_match_metric):
     experiment.prompt_template = ""
     with pytest.raises(ValueError, match="prompt_template is empty"):
-        run_experiment(experiment, examples, [exact_match_metric])
+        evaluate(experiment, examples, [exact_match_metric])
 
 
 # ---------------------------------------------------------------------------
-# Integration: run_experiment / stream_experiment
+# Integration: evaluate / stream_evaluate
 # ---------------------------------------------------------------------------
 
 
-def test_run_experiment_scores_program_output(
+def test_evaluate_scores_program_output(
     experiment, examples, exact_match_metric, fake_complete_factory
 ):
     with fake_complete_factory("4"):
-        results = run_experiment(experiment, examples[:1], [exact_match_metric])
+        results = evaluate(experiment, examples[:1], [exact_match_metric])
 
     assert len(results.trials) == 1
     assert isinstance(results.trials[0], SuccessfulTrial)
@@ -256,26 +256,24 @@ def test_run_experiment_scores_program_output(
     assert score_of(results.scorings[0]).normalized == 1.0
 
 
-def test_stream_experiment_yields_trials_before_scorings(
+def test_stream_evaluate_yields_trials_before_scorings(
     experiment, examples, exact_match_metric, fake_complete
 ):
-    items = list(stream_experiment(experiment, examples[:1], [exact_match_metric]))
+    items = list(stream_evaluate(experiment, examples[:1], [exact_match_metric]))
 
     assert len(items) == 2
     assert isinstance(items[0], SuccessfulTrial)
     assert isinstance(items[1], SuccessfulScoring)
 
 
-def test_stream_experiment_with_empty_examples_raises(experiment, exact_match_metric):
+def test_stream_evaluate_with_empty_examples_raises(experiment, exact_match_metric):
     with pytest.raises(ValueError, match="examples is empty"):
-        list(stream_experiment(experiment, [], [exact_match_metric]))
+        list(stream_evaluate(experiment, [], [exact_match_metric]))
 
 
-def test_run_experiment_runs_llm_judge_metrics_in_thread_pool(
-    experiment, examples, model, fake_complete
-):
+def test_evaluate_runs_llm_judge_metrics_in_thread_pool(experiment, examples, model, fake_complete):
     metric = make_llm_judge_metric(model)
-    results = run_experiment(experiment, examples[:1], [metric], workers=2)
+    results = evaluate(experiment, examples[:1], [metric], workers=2)
 
     assert len(results.scorings) == 1
     assert score_of(results.scorings[0]).normalized == 1.0

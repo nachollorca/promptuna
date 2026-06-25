@@ -6,7 +6,15 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from promptuna.projects import ProjectValidationError, build_catalog, build_experiment
+from promptuna.jobs import JobConfig, JobKind
+from promptuna.projects import (
+    ProjectValidationError,
+    build_catalog,
+    build_experiment,
+    get_projects_root,
+    resolve_dataset_path,
+    resolve_project_dir,
+)
 from promptuna_server import jobs
 from promptuna_server.schemas import (
     CatalogResponse,
@@ -33,6 +41,32 @@ app.add_middleware(
 
 def _validation_error(exc: ProjectValidationError) -> HTTPException:
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+def _job_config(
+    request: RunRequest,
+    *,
+    kind: JobKind,
+    metrics: list[str] | None = None,
+    steps: int | None = None,
+    proposer_model: str | None = None,
+) -> JobConfig:
+    project_dir = resolve_project_dir(request.project)
+    dataset_path = resolve_dataset_path(project_dir, request.examples)
+    return JobConfig(
+        kind=kind,
+        projects_root=get_projects_root(),
+        project=request.project,
+        program=request.program,
+        prompt=request.prompt,
+        examples=request.examples,
+        dataset_path=dataset_path,
+        model=request.model,
+        workers=request.workers,
+        metrics=tuple(metrics) if metrics is not None else None,
+        steps=steps,
+        proposer_model=proposer_model,
+    )
 
 
 @app.get("/health")
@@ -71,11 +105,13 @@ def start_run(request: RunRequest) -> JobStartResponse:
             model=request.model,
             examples=request.examples,
         )
+        config = _job_config(request, kind="run")
     except ProjectValidationError as exc:
         raise _validation_error(exc) from exc
 
     try:
         job_id = jobs.start_run_job(
+            config=config,
             experiment=experiment,
             examples=examples,
             workers=request.workers,
@@ -98,12 +134,14 @@ def start_evaluate(request: EvaluateRequest) -> JobStartResponse:
             examples=request.examples,
             metrics=request.metrics,
         )
+        config = _job_config(request, kind="evaluate", metrics=request.metrics)
     except ProjectValidationError as exc:
         raise _validation_error(exc) from exc
 
     assert metrics is not None
     try:
         job_id = jobs.start_evaluate_job(
+            config=config,
             experiment=experiment,
             examples=examples,
             metrics=metrics,
@@ -127,12 +165,20 @@ def start_optimize(request: OptimizeRequest) -> JobStartResponse:
             examples=request.examples,
             metrics=request.metrics,
         )
+        config = _job_config(
+            request,
+            kind="optimize",
+            metrics=request.metrics,
+            steps=request.steps,
+            proposer_model=request.proposer_model,
+        )
     except ProjectValidationError as exc:
         raise _validation_error(exc) from exc
 
     assert metrics is not None
     try:
         job_id = jobs.start_optimize_job(
+            config=config,
             experiment=experiment,
             examples=examples,
             metrics=metrics,

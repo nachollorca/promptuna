@@ -2,8 +2,8 @@
 
 Two entry points:
 
-- :func:`run_experiment` blocks and returns a fully-populated :class:`RunResults`.
-- :func:`stream_experiment` yields :class:`Trial` and :class:`Scoring` items
+- :func:`evaluate` blocks and returns a fully-populated :class:`RunResults`.
+- :func:`stream_evaluate` yields :class:`Trial` and :class:`Scoring` items
   as soon as they are ready, so callers can render progress or persist
   partial results and survive mid-run crashes.
 
@@ -486,7 +486,7 @@ def default_llm_judge(
 # ---------------------------------------------------------------------------
 
 
-def run_experiment(
+def evaluate(
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],
@@ -495,11 +495,11 @@ def run_experiment(
     """Run ``experiment`` over ``examples`` and score every ``metric``.
 
     Blocks until the whole run is done. For incremental consumption use
-    :func:`stream_experiment`.
+    :func:`stream_evaluate`.
     """
     trials: list[Trial] = []
     scorings: list[Scoring] = []
-    for item in stream_experiment(experiment, examples, metrics, workers=workers):
+    for item in stream_evaluate(experiment, examples, metrics, workers=workers):
         if isinstance(item, (SuccessfulTrial, FailedTrial)):
             trials.append(item)
         else:
@@ -512,7 +512,7 @@ def run_experiment(
     )
 
 
-def stream_experiment(
+def stream_evaluate(
     experiment: Experiment,
     examples: list[Example],
     metrics: list[Metric],

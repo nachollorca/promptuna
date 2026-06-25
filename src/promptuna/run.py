@@ -5,7 +5,7 @@
 
 :func:`stream_run` runs trials over a dataset with a thread pool, yielding each
 :class:`Trial` as it completes. For scoring use
-:func:`promptuna.evaluate.stream_experiment`.
+:func:`promptuna.evaluate.stream_evaluate`.
 """
 
 import inspect

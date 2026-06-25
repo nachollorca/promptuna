@@ -14,6 +14,7 @@ from helpers import fake_complete
 from promptuna_server import jobs
 from promptuna_server.main import app
 
+from promptuna.jobs import get_jobs_root, load_job
 from promptuna.optimize import Proposal, stream_optimize
 from promptuna.projects import set_projects_root
 from promptuna.run import stream_run as library_stream_run
@@ -212,6 +213,29 @@ def test_optimize_streams_checkpoint_events(client: TestClient, fake_complete_fa
 def test_unknown_job_events_returns_404(client: TestClient):
     response = client.get("/jobs/does-not-exist/events")
     assert response.status_code == 404
+
+
+def test_run_persists_archive(client: TestClient, fake_complete_patch):
+    start = client.post(
+        "/run",
+        json={
+            "project": "test_project",
+            "program": "echo",
+            "prompt": "baseline",
+            "model": "test:model",
+            "examples": "dev",
+            "workers": 1,
+        },
+    )
+    job_id = start.json()["job_id"]
+    events = _wait_for_events(client, job_id)
+
+    record = load_job(get_jobs_root(), job_id)
+    assert record.manifest["kind"] == "run"
+    assert record.manifest["status"] == "done"
+    assert record.events == events
+    assert record.summary is not None
+    assert record.summary["trial_count"] == len(events)
 
 
 def test_late_sse_subscriber_replays_completed_job(client: TestClient, fake_complete_patch):

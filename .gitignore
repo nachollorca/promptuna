@@ -66,5 +66,5 @@ scratchpad.md
 TODO.md
 PLAN.md
 
-# notebooks
-.ipynb_checkpoints*
+.promptuna_jobs/
+jobs/

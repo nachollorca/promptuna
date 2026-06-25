@@ -17,6 +17,7 @@ from promptuna.load import load_jsonl
 from promptuna.program import Example, Experiment, Program
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_RESERVED_WORKSPACE_DIRS = frozenset({"jobs"})
 _projects_root: Path | None = None
 
 
@@ -170,12 +171,18 @@ def resolve_prompt_template(project_dir: Path, prompt: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def resolve_examples(project_dir: Path, examples: str) -> list[Example]:
-    """Load ``data/<examples>.jsonl`` via :func:`promptuna.load.load_jsonl`."""
+def resolve_dataset_path(project_dir: Path, examples: str) -> Path:
+    """Return ``data/<examples>.jsonl`` after validating the dataset name."""
     _validate_name(examples, kind="examples")
     path = _resolve_under_root(project_dir, "data", f"{examples}.jsonl")
     if not path.is_file():
         raise ProjectValidationError(f"dataset {examples!r} not found")
+    return path
+
+
+def resolve_examples(project_dir: Path, examples: str) -> list[Example]:
+    """Load ``data/<examples>.jsonl`` via :func:`promptuna.load.load_jsonl`."""
+    path = resolve_dataset_path(project_dir, examples)
     loaded = load_jsonl(path)
     if not loaded:
         raise ProjectValidationError(f"dataset {examples!r} is empty")
@@ -188,7 +195,9 @@ def list_project_names() -> list[str]:
     if not root.is_dir():
         return []
     return sorted(
-        path.name for path in root.iterdir() if path.is_dir() and _NAME_RE.match(path.name)
+        path.name
+        for path in root.iterdir()
+        if path.is_dir() and _NAME_RE.match(path.name) and path.name not in _RESERVED_WORKSPACE_DIRS
     )
 
 
