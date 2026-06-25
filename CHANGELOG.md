@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.23.0 (2026-06-25)
+
+### Features
+
+- Add Typer CLI for run, evaluate, optimize, and report
+  ([`0d8dea5`](https://github.com/nachollorca/promptuna/commit/0d8dea54302ea352cb56668a056ceaee9a57cf1e))
+
+### Refactoring
+
+- Move render_history from optimize to report
+  ([`9f6389d`](https://github.com/nachollorca/promptuna/commit/9f6389d26e0f473b94358f74e17ecd66f72290e4))
+
+
 ## v1.22.0 (2026-06-25)
 
 ### Features
