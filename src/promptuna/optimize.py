@@ -27,7 +27,7 @@ from typing import Protocol
 from lmdk import complete, render_template
 from pydantic import BaseModel, Field
 
-from promptuna.evaluate import Metric, RunInfo, RunResults, Scoring, stream_experiment
+from promptuna.evaluate import Metric, RunInfo, RunResults, Scoring, stream_evaluate
 from promptuna.program import Example, Experiment
 from promptuna.report import fence_verbatim, render_run
 from promptuna.run import FailedTrial, SuccessfulTrial, Trial
@@ -233,7 +233,7 @@ def _stream_step(
     """Evaluate one checkpoint, yielding trials and scorings then the aggregated step."""
     trials: list[Trial] = []
     scorings: list[Scoring] = []
-    for item in stream_experiment(experiment, examples, metrics, workers=workers):
+    for item in stream_evaluate(experiment, examples, metrics, workers=workers):
         if isinstance(item, (SuccessfulTrial, FailedTrial)):
             trials.append(item)
         else:
@@ -273,7 +273,7 @@ def stream_optimize(
 
     1. Items for a step are contiguous: all of its trials and scorings, then
        exactly one :class:`Step`.
-    2. Within a step, trial/scoring order matches :func:`stream_experiment`
+    2. Within a step, trial/scoring order matches :func:`stream_evaluate`
        (completion order; each trial before its scorings).
     3. Between steps the proposer runs synchronously and emits nothing.
     4. The stream ends after the last :class:`Step` (early stop when a

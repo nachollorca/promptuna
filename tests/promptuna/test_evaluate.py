@@ -28,7 +28,7 @@ from promptuna.evaluate import (
     default_llm_judge,
     run_experiment,
     score_metric,
-    stream_experiment,
+    stream_evaluate,
 )
 from promptuna.program import Example
 from promptuna.run import FailedTrial, SuccessfulTrial, run_trial
@@ -240,7 +240,7 @@ def test_run_experiment_rejects_empty_prompt_template(experiment, examples, exac
 
 
 # ---------------------------------------------------------------------------
-# Integration: run_experiment / stream_experiment
+# Integration: run_experiment / stream_evaluate
 # ---------------------------------------------------------------------------
 
 
@@ -256,19 +256,19 @@ def test_run_experiment_scores_program_output(
     assert score_of(results.scorings[0]).normalized == 1.0
 
 
-def test_stream_experiment_yields_trials_before_scorings(
+def test_stream_evaluate_yields_trials_before_scorings(
     experiment, examples, exact_match_metric, fake_complete
 ):
-    items = list(stream_experiment(experiment, examples[:1], [exact_match_metric]))
+    items = list(stream_evaluate(experiment, examples[:1], [exact_match_metric]))
 
     assert len(items) == 2
     assert isinstance(items[0], SuccessfulTrial)
     assert isinstance(items[1], SuccessfulScoring)
 
 
-def test_stream_experiment_with_empty_examples_raises(experiment, exact_match_metric):
+def test_stream_evaluate_with_empty_examples_raises(experiment, exact_match_metric):
     with pytest.raises(ValueError, match="examples is empty"):
-        list(stream_experiment(experiment, [], [exact_match_metric]))
+        list(stream_evaluate(experiment, [], [exact_match_metric]))
 
 
 def test_run_experiment_runs_llm_judge_metrics_in_thread_pool(

@@ -10,7 +10,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from promptuna.evaluate import Metric, Scoring, stream_experiment
+from promptuna.evaluate import Metric, Scoring, stream_evaluate
 from promptuna.jobs import JobArchive, JobConfig, JobKind, JobStatus, get_jobs_root, stream_job
 from promptuna.optimize import Step, stream_optimize
 from promptuna.program import Example, Experiment
@@ -79,7 +79,7 @@ def start_evaluate_job(
     """Start an evaluate job and return its ``job_id``."""
     return _start_job(
         "evaluate",
-        lambda: stream_experiment(experiment, examples, metrics, workers=workers),
+        lambda: stream_evaluate(experiment, examples, metrics, workers=workers),
         config=config,
     )
 
