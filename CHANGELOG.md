@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.22.0 (2026-06-25)
+
+### Features
+
+- Add on-disk job persistence for server streaming jobs
+  ([`c84ece5`](https://github.com/nachollorca/promptuna/commit/c84ece51bdf601fcb243a6cf746b7f0745e962cb))
+
+- Add stream_job wrapper for shared job persistence
+  ([`b81de49`](https://github.com/nachollorca/promptuna/commit/b81de49325764fc7aa5a958a34d7e00523d57f9f))
+
+### Refactoring
+
+- Rename run_experiment to evaluate
+  ([`e1ddd73`](https://github.com/nachollorca/promptuna/commit/e1ddd73ccc775092ce99c3687367818da4239b8d))
+
+- Rename stream_experiment to stream_evaluate
+  ([`7b3c124`](https://github.com/nachollorca/promptuna/commit/7b3c1240c98503312934e1a29d8b47fb2ae9aebd))
+
+
 ## v1.21.0 (2026-06-24)
 
 ### Features
