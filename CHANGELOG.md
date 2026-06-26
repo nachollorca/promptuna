@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.25.0 (2026-06-26)
+
+### Bug Fixes
+
+- Add PyPI readme and metadata to satellite packages
+  ([`d858434`](https://github.com/nachollorca/promptuna/commit/d85843466d5b44131f82a44582f608b484e5dd91))
+
+### Continuous Integration
+
+- Refresh lock
+  ([`9b3ea4e`](https://github.com/nachollorca/promptuna/commit/9b3ea4e1bfb490e7f6eea4824ce232f7060e352f))
+
+### Features
+
+- **cli**: Surface SKILL.md in promptuna --help
+  ([`9c2c08d`](https://github.com/nachollorca/promptuna/commit/9c2c08d1c8daec4d02932123e6b8e67a6b0e8ea2))
+
+
 ## v1.24.0 (2026-06-26)
 
 ### Chores
