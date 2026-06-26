@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 
 import pytest
+from promptuna_cli.main import app
 from typer.testing import CliRunner
 
-from promptuna.cli.main import app
 from promptuna.jobs import get_jobs_root, load_job
 from promptuna.projects import set_projects_root
 

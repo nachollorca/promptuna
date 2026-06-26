@@ -43,7 +43,10 @@ jobs:
       - name: Build and publish in PyPi
         if: steps.release.outputs.released == 'true'
         run: |
-          uv build
+          rm -rf dist
+          uv build --package promptuna
+          uv build --package promptuna-cli
+          uv build --package promptuna-server
           uv publish dist/*
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}

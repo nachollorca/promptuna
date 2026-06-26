@@ -1,13 +1,15 @@
 [project]
-name = "promptuna-server"
+name = "promptuna-cli"
 version = "1.23.0"
-description = "FastAPI server for streaming promptuna run / evaluate / optimize jobs"
+description = "Typer CLI for on-disk promptuna run / evaluate / optimize jobs"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.115.0",
     "promptuna==1.23.0",
-    "uvicorn[standard]>=0.32.0",
+    "typer>=0.12",
 ]
+
+[project.scripts]
+promptuna = "promptuna_cli.main:run_cli"
 
 [tool.uv.sources]
 promptuna = { workspace = true }

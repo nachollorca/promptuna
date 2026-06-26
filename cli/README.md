@@ -1,9 +1,9 @@
 # promptuna-cli
 
-Typer CLI for on-disk promptuna projects. Installed with the core package:
+Typer CLI for on-disk promptuna projects. Installed as a separate package (pulls in `promptuna`):
 
 ```bash
-pip install promptuna[cli]
+pip install promptuna-cli
 ```
 
 ## Commands
