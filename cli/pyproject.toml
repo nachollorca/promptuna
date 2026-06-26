@@ -1,10 +1,10 @@
 [project]
 name = "promptuna-cli"
-version = "1.23.0"
+version = "1.24.0"
 description = "Typer CLI for on-disk promptuna run / evaluate / optimize jobs"
 requires-python = ">=3.13"
 dependencies = [
-    "promptuna==1.23.0",
+    "promptuna==1.24.0",
     "typer>=0.12",
 ]
 

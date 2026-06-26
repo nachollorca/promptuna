@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.24.0 (2026-06-26)
+
+### Chores
+
+- **release**: Publish all workspace packages with unified versioning
+  ([`9bc574d`](https://github.com/nachollorca/promptuna/commit/9bc574d1bcd97d9939dcbda7cefb2d39f3caec0b))
+
+### Features
+
+- Document unified workspace versioning and release flow
+  ([`b94e65c`](https://github.com/nachollorca/promptuna/commit/b94e65ce18eca52a6b5fbd2a8fda244dc4634eb6))
+
+### Refactoring
+
+- **cli**: Extract Typer CLI into separate workspace package
+  ([`e860544`](https://github.com/nachollorca/promptuna/commit/e860544924c74c952d02c5403eccfa5d51214871))
+
+
 ## v1.23.0 (2026-06-25)
 
 ### Features
