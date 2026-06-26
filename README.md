@@ -37,7 +37,7 @@ The loop above maps directly onto the package layout:
 | **Web** | Server available; frontend planned | Run [`promptuna-server`](server/) against a projects root; jobs stream over HTTP + SSE. A SvelteKit UI is planned in [`frontend/`](frontend/). |
 | **Agent / terminal** | CLI available | Run [`promptuna-cli`](cli/) against a projects root, or use [`SKILL.md`](SKILL.md) for coding-agent workflows (`run`, `evaluate`, `optimize` from the terminal). |
 
-Projects live as directories under a **projects root** (default: repo `samples/`; override with `PROMPTUNA_PROJECTS_ROOT`). Programs and metrics are Python modules on disk — they cannot be sent over HTTP as JSON — so the server and future CLI resolve them locally via name selectors.
+Projects live as directories under a **projects root** (default: repo `samples/`; override with `PROMPTUNA_PROJECTS_ROOT`). Programs and metrics are Python modules on disk — they cannot be sent over HTTP as JSON — so the server and CLI resolve them locally via name selectors.
 
 ## Optimization
 
@@ -59,6 +59,23 @@ Some ideas regarding evaluation metrics are taken from the seemingly already aba
 The optimization loop itself takes concepts from [DeepMind's OPRO](https://arxiv.org/pdf/2309.03409): at each step an LM proposer rewrites the prompt template from scratch using the full scored history of prior candidates.
 
 The name of the package itself is a reference to the infamous [Optuna](https://github.com/optuna/optuna): a fixed-budget search over trials that archives every checkpoint and returns the best one seen.
+
+## Versioning and release
+
+This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with three publishable packages that share one version number:
+`promptuna`, `promptuna-cli` and `promptuna-server`.
+
+**Unified versioning.** All three `project.version` fields stay in lockstep (e.g. `1.23.0` everywhere). Satellite packages declare `promptuna==<that version>` so `pip install promptuna-cli` pulls a matching core release.
+
+**What triggers a release.** On every push to `main`, [python-semantic-release](https://python-semantic-release.readthedocs.io/) scans commits since the last tag and decides whether the semver should bump.
+
+**Release steps** (see [`.github/workflows/release.yml`](.github/workflows/release.yml)):
+
+1. PSR bumps the version in `pyproject.toml`, `cli/pyproject.toml`, and `server/pyproject.toml`, then runs [`scripts/sync_workspace_pins.py`](scripts/sync_workspace_pins.py) to refresh the `promptuna==…` pins before committing `chore: release {version}` and tagging `v{version}`.
+2. CI builds wheels for all three packages and publishes them to PyPI.
+3. A GitHub release is created for the tag.
+
+**Development.** `uv sync --all-groups` (i.e.: `just install`) installs every workspace member locally. PyPI users install only what they need (`promptuna`, `promptuna-cli`, and/or `promptuna-server`).
 
 ## License
 MIT
