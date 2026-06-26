@@ -11,12 +11,6 @@ dependencies = [
     "lmdk>=1.8.0",
 ]
 
-[project.scripts]
-promptuna = "promptuna.cli.main:run_cli"
-
-[project.optional-dependencies]
-cli = ["typer>=0.12"]
-
 # Dev / optional dependencies -------------------------------------------------
 [dependency-groups]
 dev = [
@@ -27,6 +21,7 @@ dev = [
     "ipykernel>=7.2.0",
     "jupyter>=1.1.1",
     "logfire>=4.36.0",
+    "promptuna-cli",
     "promptuna-server",
     "pytest>=9.0.3",
     "pytest-cov",
@@ -36,12 +31,12 @@ dev = [
 ]
 
 [tool.uv.sources]
+promptuna-cli = { workspace = true }
 promptuna-server = { workspace = true }
 
 # uv workspace ---------------------------------------------------------------
-# Add "cli" when the promptuna-cli package lands.
 [tool.uv.workspace]
-members = [".", "server"]
+members = [".", "cli", "server"]
 
 # Build backend ---------------------------------------------------------------
 [build-system]
@@ -66,10 +61,10 @@ convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "server/src", "tests"]
+pythonpath = ["src", "cli/src", "server/src", "tests"]
 
 [tool.coverage.run]
-source = ["promptuna", "promptuna_server"]
+source = ["promptuna", "promptuna_cli", "promptuna_server"]
 
 [tool.coverage.report]
 fail_under = 90

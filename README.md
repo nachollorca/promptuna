@@ -35,7 +35,7 @@ The loop above maps directly onto the package layout:
 | --- | --- | --- |
 | **Library** | Available | `pip install promptuna` and wire programs, metrics, and datasets in Python — see [`getting_started.py`](getting_started.py). |
 | **Web** | Server available; frontend planned | Run [`promptuna-server`](server/) against a projects root; jobs stream over HTTP + SSE. A SvelteKit UI is planned in [`frontend/`](frontend/). |
-| **Agent / terminal** | CLI planned | A Typer CLI in [`cli/`](cli/) plus [`SKILL.md`](SKILL.md) for coding-agent workflows (`run`, `evaluate`, `optimize` from the terminal). |
+| **Agent / terminal** | CLI available | Run [`promptuna-cli`](cli/) against a projects root, or use [`SKILL.md`](SKILL.md) for coding-agent workflows (`run`, `evaluate`, `optimize` from the terminal). |
 
 Projects live as directories under a **projects root** (default: repo `samples/`; override with `PROMPTUNA_PROJECTS_ROOT`). Programs and metrics are Python modules on disk — they cannot be sent over HTTP as JSON — so the server and future CLI resolve them locally via name selectors.
 

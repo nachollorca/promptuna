@@ -8,16 +8,6 @@ from typing import Annotated
 
 import typer
 
-from promptuna.cli._common import (
-    OutputFormat,
-    apply_projects_root,
-    build_job_config,
-    execute_job,
-    handle_project_error,
-    parse_metric_names,
-    render_optimize_human,
-    render_run_human,
-)
 from promptuna.evaluate import stream_evaluate
 from promptuna.jobs import get_jobs_root, load_job
 from promptuna.optimize import stream_optimize
@@ -28,6 +18,16 @@ from promptuna.projects import (
     resolve_project_dir,
 )
 from promptuna.run import stream_run
+from promptuna_cli._common import (
+    OutputFormat,
+    apply_projects_root,
+    build_job_config,
+    execute_job,
+    handle_project_error,
+    parse_metric_names,
+    render_optimize_human,
+    render_run_human,
+)
 
 app = typer.Typer(
     name="promptuna",
