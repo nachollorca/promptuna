@@ -1,11 +1,11 @@
 [project]
 name = "promptuna-server"
-version = "0.1.0"
+version = "1.23.0"
 description = "FastAPI server for streaming promptuna run / evaluate / optimize jobs"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.0",
-    "promptuna",
+    "promptuna==1.23.0",
     "uvicorn[standard]>=0.32.0",
 ]
 

@@ -71,8 +71,12 @@ fail_under = 90
 
 # Semantic release (automated versioning from conventional commits) -----------
 [tool.semantic_release]
-version_toml = ["pyproject.toml:project.version"]
-build_command = ""  # We do this using uv in the CI verify.yaml workflow
+version_toml = [
+    "pyproject.toml:project.version",
+    "cli/pyproject.toml:project.version",
+    "server/pyproject.toml:project.version",
+]
+build_command = "python scripts/sync_workspace_pins.py"
 commit_message = "chore: release {version}"
 commit_parser = "conventional"
 tag_format = "v{version}"
