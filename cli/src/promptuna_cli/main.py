@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from importlib.resources import files
 from pathlib import Path
 from typing import Annotated
 
@@ -29,11 +30,17 @@ from promptuna_cli._common import (
     render_run_human,
 )
 
+
+def _root_help() -> str:
+    return files("promptuna_cli").joinpath("SKILL.md").read_text(encoding="utf-8")
+
+
 app = typer.Typer(
     name="promptuna",
     no_args_is_help=True,
     add_completion=False,
-    help="Run, evaluate, and optimize on-disk promptuna projects.",
+    help=_root_help(),
+    rich_markup_mode="markdown",
 )
 
 
