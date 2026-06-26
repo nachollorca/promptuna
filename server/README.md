@@ -1,5 +1,7 @@
 # promptuna-server
 
+> Server surface for the [`promptuna`](https://pypi.org/project/promptuna/) evaluation harness. See the [main project README](https://github.com/nachollorca/promptuna#readme) for the full overview, library API, and usage surfaces.
+
 HTTP + SSE transport for `promptuna` jobs (`run`, `evaluate`, `optimize`).
 
 This package is **transport only**. It does not define evaluation logic — that lives in the core `promptuna` library. On-disk projects are resolved via [`promptuna.projects`](../src/promptuna/projects.py); user projects do not belong in this directory.

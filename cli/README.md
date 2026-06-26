@@ -1,5 +1,7 @@
 # promptuna-cli
 
+> CLI surface for the [`promptuna`](https://pypi.org/project/promptuna/) evaluation harness. See the [main project README](https://github.com/nachollorca/promptuna#readme) for the full overview, library API, and usage surfaces.
+
 Typer CLI for on-disk promptuna projects. Installed as a separate package (pulls in `promptuna`):
 
 ```bash
