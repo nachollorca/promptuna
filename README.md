@@ -45,6 +45,24 @@ Prompt-template search (OPRO-style) treats evaluation as **multi-criteria**: eac
 
 The optimizer uses the metrics to learn the representation of the data and the expectations of the task, then encodes that knowledge in the prompt template.
 
+This is **rubric discovery**, not epoch training. Each step is a full re-evaluation of a new template; the proposer infers what the metrics still leave implicit from failure traces and encodes it in the prompt. For many tasks the missing rubric is a small set of concepts, so scores often climb steeply in the first few steps and then flatten or oscillate as remaining errors become idiosyncratic, metric tradeoffs, or judge noise.
+
+Holdout evaluation is the caller's responsibility (`optimize` scores the same `examples` every step). Late-step oscillation can also come from compensatory headline scoring (a gain on one metric offset by a loss on another), from `replicate_noise` larger than real improvements, or from the proposer refining the ⭐ best checkpoint with edits too small to move the scalar.
+
+Long runs with document-heavy examples can bloat proposer context (every checkpoint's template is kept; error analysis with full `rendered_prompt` blocks is attached only to the best and latest steps). The default budget is tuned for bootstrapping a good template quickly, not for dozens of exploratory steps.
+
+Taking all that into account, these are the highest-leverage directions—custom proposers, trajectory rendering, or outer orchestration—not built-in modes today:
+
+| Direction | Rationale |
+| --- | --- |
+| **Plateau-triggered exploration** | When the best score is unchanged for *k* steps, ask for a structurally different template or branch from diverse past checkpoints. |
+| **Trajectory summarization / sliding window** | Keep full detail for the last few steps plus the best; compress older steps to score, diff, and lesson. Reduces context growth and repetition. |
+| **Deduplicate weak examples** | Prefer fresh failures over the same weakest examples every step; cluster failure modes into representatives. |
+| **Noise-aware proposer prompt** | Instruct the proposer to ignore deltas smaller than `replicate_noise` so it does not chase judge variance. |
+| **Holdout evaluation** | Optimize on dev, report on holdout each step—separates rubric learning from memorizing examples. |
+| **Separate explorer / exploiter proposers** | Refine the best checkpoint most steps; run exploration only on a schedule or when plateaued. |
+| **Paraphrase scoring** | Occasionally score rewordings of the best template to test whether wording—not rubric content—is the bottleneck. |
+
 ## Inspiration
 
 `promptuna` is a proud Frankenstein of [DSPy](https://github.com/stanfordnlp/dspy), [Ragas](https://github.com/vibrantlabsai/ragas), [OPRO](https://arxiv.org/pdf/2309.03409)] and [Optuna](https://github.com/optuna/optuna).
