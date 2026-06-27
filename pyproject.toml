@@ -63,6 +63,9 @@ convention = "google"
 testpaths = ["tests"]
 pythonpath = ["src", "cli/src", "server/src", "tests"]
 
+[tool.ty.environment]
+root = ["./src", "./cli/src", "./server/src", "./tests"]
+
 [tool.coverage.run]
 source = ["promptuna", "promptuna_cli", "promptuna_server"]
 
