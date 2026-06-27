@@ -27,6 +27,24 @@ The loop above maps directly onto the package layout:
 
 **See the [getting started notebook](getting_started.ipynb) for a full working example of this cycle end to end.**
 
+## Metrics, not prompts
+
+If you have a task, enough examples, and can say what makes an output good or bad, you should not be hand-writing prompts. Encode quality as **metrics** and let an LM run the loop: execute the program, score the outputs, revise the template, repeat. That work is tedious for humans—running cases in bulk, staying consistent across hundreds of examples, iterating without losing thread—but it is exactly what an automated proposer is for.
+
+**Domain experts should define what good means, not how to phrase it.** Spend effort on rubrics, edge cases, and scoring logic; let search discover the wording. That split also survives model churn: instructions tuned for one model can hurt another, but a metric that states the rubric in plain terms stays valid—the optimizer re-derives phrasing for each model from the same definition of quality.
+
+## What you can optimize
+
+In an LM-centered system, the lever you pull depends on what you are allowed to change:
+
+| Knob | You need | Typical move |
+| --- | --- | --- |
+| **Model weights** | Data and a training pipeline | SFT, RL — highest ceiling, highest cost to ship and maintain |
+| **Prompt (in-context)** | Data but a fixed model | Search over templates — often the best effort-to-impact ratio |
+| **Scaffold, schema, model choice** | A fixed program shape | Human engineering around the completion call |
+
+When you cannot—or should not—retrain, treat the model as fixed and optimize what happens **in context**: the prompt template. That is usually the highest-leverage knob available: same dataset, same metrics, no weight update, and a short search can recover large gains. `promptuna` focuses on that layer; the metrics you write are the durable artifact, the prompt is what the loop synthesizes.
+
 ## Usage surfaces
 
 `promptuna` can be used in three ways. All non-library surfaces share the same **on-disk project layout** (see [`samples/README.md`](samples/README.md)).
