@@ -27,6 +27,24 @@ The loop above maps directly onto the package layout:
 
 **See the [getting started notebook](getting_started.ipynb) for a full working example of this cycle end to end.**
 
+## Metrics, not prompts
+
+If you have a task, enough examples, and can say what makes an output good or bad, you should not be hand-writing prompts. Encode quality as **metrics** and let an LM run the loop: execute the program, score the outputs, revise the template, repeat. That work is tedious for humans—running cases in bulk, staying consistent across hundreds of examples, iterating without losing thread—but it is exactly what an automated proposer is for.
+
+**Domain experts should define what good means, not how to phrase it.** Spend effort on rubrics, edge cases, and scoring logic; let search discover the wording. That split also survives model churn: instructions tuned for one model can hurt another, but a metric that states the rubric in plain terms stays valid—the optimizer re-derives phrasing for each model from the same definition of quality.
+
+## What you can optimize
+
+In an LM-centered system, the lever you pull depends on what you are allowed to change:
+
+| Knob | You need | Typical move |
+| --- | --- | --- |
+| **Model weights** | Data and a training pipeline | SFT, RL — highest ceiling, highest cost to ship and maintain |
+| **Prompt (in-context)** | Data but a fixed model | Search over templates — often the best effort-to-impact ratio |
+| **Scaffold, schema, model choice** | A fixed program shape | Human engineering around the completion call |
+
+When you cannot—or should not—retrain, treat the model as fixed and optimize what happens **in context**: the prompt template. That is usually the highest-leverage knob available: same dataset, same metrics, no weight update, and a short search can recover large gains. `promptuna` focuses on that layer; the metrics you write are the durable artifact, the prompt is what the loop synthesizes.
+
 ## Usage surfaces
 
 `promptuna` can be used in three ways. All non-library surfaces share the same **on-disk project layout** (see [`samples/README.md`](samples/README.md)).
@@ -44,6 +62,24 @@ Projects live as directories under a **projects root** (default: repo `samples/`
 Prompt-template search (OPRO-style) treats evaluation as **multi-criteria**: each candidate is scored on several normalized metrics, forming a quality vector in metric space. Before comparing checkpoints, that vector is collapsed by a fixed **linear scalarization**—the unweighted mean of per-metric means (`RunResults.overall.mean`), a compensatory aggregation where gains on one metric can offset losses on another. The search is therefore **single-objective** in template space: it maximizes one scalar utility, keeps the best checkpoint seen so far, and does not explore a Pareto front over metrics. The proposer still receives per-metric breakdowns in the trajectory (`render_history`); only ranking and early stopping use the headline score.
 
 The optimizer uses the metrics to learn the representation of the data and the expectations of the task, then encodes that knowledge in the prompt template.
+
+This is **rubric discovery**, not epoch training. Each step is a full re-evaluation of a new template; the proposer infers what the metrics still leave implicit from failure traces and encodes it in the prompt. For many tasks the missing rubric is a small set of concepts, so scores often climb steeply in the first few steps and then flatten or oscillate as remaining errors become idiosyncratic, metric tradeoffs, or judge noise.
+
+Holdout evaluation is the caller's responsibility (`optimize` scores the same `examples` every step). Late-step oscillation can also come from compensatory headline scoring (a gain on one metric offset by a loss on another), from `replicate_noise` larger than real improvements, or from the proposer refining the ⭐ best checkpoint with edits too small to move the scalar.
+
+Long runs with document-heavy examples can bloat proposer context (every checkpoint's template is kept; error analysis with full `rendered_prompt` blocks is attached only to the best and latest steps). The default budget is tuned for bootstrapping a good template quickly, not for dozens of exploratory steps.
+
+Taking all that into account, these are the highest-leverage directions—custom proposers, trajectory rendering, or outer orchestration—not built-in modes today:
+
+| Direction | Rationale |
+| --- | --- |
+| **Plateau-triggered exploration** | When the best score is unchanged for *k* steps, ask for a structurally different template or branch from diverse past checkpoints. |
+| **Trajectory summarization / sliding window** | Keep full detail for the last few steps plus the best; compress older steps to score, diff, and lesson. Reduces context growth and repetition. |
+| **Deduplicate weak examples** | Prefer fresh failures over the same weakest examples every step; cluster failure modes into representatives. |
+| **Noise-aware proposer prompt** | Instruct the proposer to ignore deltas smaller than `replicate_noise` so it does not chase judge variance. |
+| **Holdout evaluation** | Optimize on dev, report on holdout each step—separates rubric learning from memorizing examples. |
+| **Separate explorer / exploiter proposers** | Refine the best checkpoint most steps; run exploration only on a schedule or when plateaued. |
+| **Paraphrase scoring** | Occasionally score rewordings of the best template to test whether wording—not rubric content—is the bottleneck. |
 
 ## Inspiration
 
