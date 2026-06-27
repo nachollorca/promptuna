@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.25.1 (2026-06-27)
+
+### Bug Fixes
+
+- Configure ty roots for workspace and test packages
+  ([`9fad4c0`](https://github.com/nachollorca/promptuna/commit/9fad4c0213e23266d7b0e0629a779c971c9a8e6c))
+
+### Documentation
+
+- Add metrics-over-prompts philosophy to README
+  ([`e850cd3`](https://github.com/nachollorca/promptuna/commit/e850cd3aa2bb881e4f7da5579c8447b54ecf4c2d))
+
+- Explain optimizer plateaus and extension directions in README
+  ([`446052a`](https://github.com/nachollorca/promptuna/commit/446052ac63fcb47e2c1a1b0ba17b2a88e352118e))
+
+
 ## v1.25.0 (2026-06-26)
 
 ### Bug Fixes
