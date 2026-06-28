@@ -9,9 +9,10 @@ import type {
 } from '$lib/types';
 
 const baseUrl = PUBLIC_API_URL.replace(/\/$/, '');
+const API_PREFIX = '/api';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(`${baseUrl}${path}`, init);
+	const response = await fetch(`${baseUrl}${API_PREFIX}${path}`, init);
 	if (!response.ok) {
 		let detail = response.statusText;
 		try {

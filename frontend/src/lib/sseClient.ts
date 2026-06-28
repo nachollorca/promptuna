@@ -16,7 +16,7 @@ export function connectJobEvents(
 
 	void (async () => {
 		try {
-			const response = await fetch(`${apiBaseUrl()}/jobs/${jobId}/events`, {
+			const response = await fetch(`${apiBaseUrl()}/api/jobs/${jobId}/events`, {
 				signal: controller.signal,
 				headers: { Accept: 'text/event-stream' }
 			});

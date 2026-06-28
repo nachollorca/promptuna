@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException, status
+import os
+from pathlib import Path
+
+from fastapi import APIRouter, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from promptuna.jobs import JobConfig, JobKind
 from promptuna.projects import (
@@ -29,6 +33,7 @@ from promptuna_server.schemas import (
 )
 
 app = FastAPI(title="promptuna-server")
+api = APIRouter()
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,13 +77,13 @@ def _job_config(
     )
 
 
-@app.get("/health")
+@api.get("/health")
 def health() -> dict[str, str]:
     """Liveness check."""
     return {"status": "ok"}
 
 
-@app.get("/catalog", response_model=CatalogResponse)
+@api.get("/catalog", response_model=CatalogResponse)
 def catalog() -> CatalogResponse:
     """List project and artifact names under the active projects root."""
     workspace = build_catalog()
@@ -117,14 +122,14 @@ def _manifest_to_list_item(manifest: dict) -> JobListItemResponse:
     )
 
 
-@app.get("/jobs", response_model=JobListResponse)
+@api.get("/jobs", response_model=JobListResponse)
 def list_jobs() -> JobListResponse:
     """List persisted jobs under the active projects root."""
     manifests = jobs.list_jobs()
     return JobListResponse(jobs=[_manifest_to_list_item(manifest) for manifest in manifests])
 
 
-@app.get("/jobs/{job_id}", response_model=JobDetailResponse)
+@api.get("/jobs/{job_id}", response_model=JobDetailResponse)
 def get_job(job_id: str) -> JobDetailResponse:
     """Return manifest, events, and optional summary for one job."""
     try:
@@ -139,7 +144,7 @@ def get_job(job_id: str) -> JobDetailResponse:
     )
 
 
-@app.post("/run", response_model=JobStartResponse)
+@api.post("/run", response_model=JobStartResponse)
 def start_run(request: RunRequest) -> JobStartResponse:
     """Start a run job; stream trials via ``GET /jobs/{job_id}/events``."""
     try:
@@ -167,7 +172,7 @@ def start_run(request: RunRequest) -> JobStartResponse:
     return JobStartResponse(job_id=job_id)
 
 
-@app.post("/evaluate", response_model=JobStartResponse)
+@api.post("/evaluate", response_model=JobStartResponse)
 def start_evaluate(request: EvaluateRequest) -> JobStartResponse:
     """Start an evaluate job; stream trials and scorings via SSE."""
     try:
@@ -198,7 +203,7 @@ def start_evaluate(request: EvaluateRequest) -> JobStartResponse:
     return JobStartResponse(job_id=job_id)
 
 
-@app.post("/optimize", response_model=JobStartResponse)
+@api.post("/optimize", response_model=JobStartResponse)
 def start_optimize(request: OptimizeRequest) -> JobStartResponse:
     """Start an optimize job; stream trials, scorings, and steps via SSE."""
     try:
@@ -237,7 +242,7 @@ def start_optimize(request: OptimizeRequest) -> JobStartResponse:
     return JobStartResponse(job_id=job_id)
 
 
-@app.get("/jobs/{job_id}/events")
+@api.get("/jobs/{job_id}/events")
 async def job_events(job_id: str) -> StreamingResponse:
     """Server-sent events for one job until it completes or errors."""
     try:
@@ -249,3 +254,37 @@ async def job_events(job_id: str) -> StreamingResponse:
         jobs.stream_job_events(job_id),
         media_type="text/event-stream",
     )
+
+
+app.include_router(api, prefix="/api")
+
+
+def _mount_static_files(application: FastAPI) -> None:
+    """Serve the built SvelteKit app when ``PROMPTUNA_STATIC_DIR`` is set."""
+    static_dir = os.environ.get("PROMPTUNA_STATIC_DIR", "").strip()
+    if not static_dir:
+        return
+
+    root = Path(static_dir)
+    index_html = root / "index.html"
+    if not index_html.is_file():
+        return
+
+    assets_dir = root / "_app"
+    if assets_dir.is_dir():
+        application.mount("/_app", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @application.get("/{path:path}", include_in_schema=False)
+    async def serve_frontend(path: str) -> FileResponse:
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+        if path:
+            file_path = root / path
+            if file_path.is_file():
+                return FileResponse(file_path)
+
+        return FileResponse(index_html)
+
+
+_mount_static_files(app)

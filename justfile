@@ -26,22 +26,6 @@ update-hooks:
 run-hooks:
     prek run --show-diff-on-failure --color=always -a
 
-# Frontend --------------------------------------------------------------------
-frontend-install:
-    npm ci --prefix frontend
-
-frontend-format:
-    npm run format --prefix frontend
-    npm run lint:fix --prefix frontend
-
-frontend-check:
-    npm run check --prefix frontend
-    npm run lint --prefix frontend
-    npm run format:check --prefix frontend
-
-frontend-build:
-    npm run build --prefix frontend
-
 # Code quality ----------------------------------------------------------------
 format *paths=".":
     uv run --frozen ruff check --fix {{ paths }}
@@ -67,3 +51,38 @@ notebook:
 # Uses bundled samples/ by default; set PROMPTUNA_PROJECTS_ROOT to override.
 server:
     uv run --frozen uvicorn promptuna_server.main:app --reload --port 6969
+
+
+# Frontend --------------------------------------------------------------------
+frontend-install:
+    npm ci --prefix frontend
+
+frontend-format:
+    npm run format --prefix frontend
+    npm run lint:fix --prefix frontend
+
+frontend-check:
+    npm run check --prefix frontend
+    npm run lint --prefix frontend
+    npm run format:check --prefix frontend
+
+frontend-build:
+    npm run build --prefix frontend
+
+frontend-dev:
+    npm run dev --prefix frontend
+
+# Container image (packaged UI + API on one port) ---------------------------
+# Uses podman when available, otherwise docker. Override: CONTAINER_ENGINE=docker
+container-engine := env_var_or_default('CONTAINER_ENGINE', `command -v podman >/dev/null 2>&1 && echo podman || echo docker`)
+docker-image := "promptuna:local"
+
+docker-build:
+    {{ container-engine }} build -t {{ docker-image }} .
+
+docker-run *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    env_args=()
+    if [[ -f .env ]]; then env_args=(--env-file .env); fi
+    {{ container-engine }} run --rm -p 8080:8080 "${env_args[@]}" {{ args }} {{ docker-image }}

@@ -56,19 +56,19 @@ def _read_sse_events(response) -> list[dict]:
 
 
 def _wait_for_events(client: TestClient, job_id: str) -> list[dict]:
-    with client.stream("GET", f"/jobs/{job_id}/events") as response:
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as response:
         assert response.status_code == 200
         return _read_sse_events(response)
 
 
 def test_health(client: TestClient):
-    response = client.get("/health")
+    response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
 def test_catalog_lists_fixture_project_names(client: TestClient):
-    response = client.get("/catalog")
+    response = client.get("/api/catalog")
     assert response.status_code == 200
     body = response.json()
     assert body["projects_root"] == str(FIXTURES.parent.resolve())
@@ -94,7 +94,7 @@ def test_concurrent_job_returns_409(client: TestClient, fake_complete_patch):
 
     with patch("promptuna_server.jobs.stream_run", side_effect=blocking_stream_run):
         first = client.post(
-            "/run",
+            "/api/run",
             json={
                 "project": "test_project",
                 "program": "echo",
@@ -109,7 +109,7 @@ def test_concurrent_job_returns_409(client: TestClient, fake_complete_patch):
         assert started.wait(timeout=2)
 
         second = client.post(
-            "/run",
+            "/api/run",
             json={
                 "project": "test_project",
                 "program": "echo",
@@ -130,7 +130,7 @@ def test_concurrent_job_returns_409(client: TestClient, fake_complete_patch):
 
 def test_run_streams_trial_events(client: TestClient, fake_complete_patch):
     start = client.post(
-        "/run",
+        "/api/run",
         json={
             "project": "test_project",
             "program": "echo",
@@ -151,7 +151,7 @@ def test_run_streams_trial_events(client: TestClient, fake_complete_patch):
 
 def test_evaluate_streams_trial_and_scoring_events(client: TestClient, fake_complete_patch):
     start = client.post(
-        "/evaluate",
+        "/api/evaluate",
         json={
             "project": "test_project",
             "program": "echo",
@@ -184,7 +184,7 @@ def test_optimize_streams_checkpoint_events(client: TestClient, fake_complete_fa
         ),
     ):
         start = client.post(
-            "/optimize",
+            "/api/optimize",
             json={
                 "project": "test_project",
                 "program": "echo",
@@ -216,13 +216,13 @@ def test_optimize_streams_checkpoint_events(client: TestClient, fake_complete_fa
 
 
 def test_unknown_job_events_returns_404(client: TestClient):
-    response = client.get("/jobs/does-not-exist/events")
+    response = client.get("/api/jobs/does-not-exist/events")
     assert response.status_code == 404
 
 
 def test_run_persists_archive(client: TestClient, fake_complete_patch):
     start = client.post(
-        "/run",
+        "/api/run",
         json={
             "project": "test_project",
             "program": "echo",
@@ -245,7 +245,7 @@ def test_run_persists_archive(client: TestClient, fake_complete_patch):
 
 def test_late_sse_subscriber_replays_completed_job(client: TestClient, fake_complete_patch):
     start = client.post(
-        "/run",
+        "/api/run",
         json={
             "project": "test_project",
             "program": "echo",
@@ -264,7 +264,7 @@ def test_late_sse_subscriber_replays_completed_job(client: TestClient, fake_comp
 
 def test_list_jobs_returns_persisted_manifests(client: TestClient, fake_complete_patch):
     start = client.post(
-        "/run",
+        "/api/run",
         json={
             "project": "test_project",
             "program": "echo",
@@ -277,7 +277,7 @@ def test_list_jobs_returns_persisted_manifests(client: TestClient, fake_complete
     job_id = start.json()["job_id"]
     _wait_for_events(client, job_id)
 
-    response = client.get("/jobs")
+    response = client.get("/api/jobs")
     assert response.status_code == 200
     item = next(item for item in response.json()["jobs"] if item["job_id"] == job_id)
     assert item["kind"] == "run"
@@ -287,7 +287,7 @@ def test_list_jobs_returns_persisted_manifests(client: TestClient, fake_complete
 
 def test_get_job_returns_manifest_events_and_summary(client: TestClient, fake_complete_patch):
     start = client.post(
-        "/evaluate",
+        "/api/evaluate",
         json={
             "project": "test_project",
             "program": "echo",
@@ -301,7 +301,7 @@ def test_get_job_returns_manifest_events_and_summary(client: TestClient, fake_co
     job_id = start.json()["job_id"]
     events = _wait_for_events(client, job_id)
 
-    response = client.get(f"/jobs/{job_id}")
+    response = client.get(f"/api/jobs/{job_id}")
     assert response.status_code == 200
     body = response.json()
     assert body["manifest"]["job_id"] == job_id
@@ -313,5 +313,5 @@ def test_get_job_returns_manifest_events_and_summary(client: TestClient, fake_co
 
 
 def test_get_unknown_job_returns_404(client: TestClient):
-    response = client.get("/jobs/does-not-exist")
+    response = client.get("/api/jobs/does-not-exist")
     assert response.status_code == 404

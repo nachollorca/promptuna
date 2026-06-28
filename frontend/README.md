@@ -8,7 +8,7 @@ Design reference: [HANDOFF.md](./HANDOFF.md)
 
 ```bash
 just server          # API → http://127.0.0.1:6969
-cd frontend && npm install && npm run dev   # UI → http://localhost:5173
+just frontend-dev    # UI → http://localhost:5173
 ```
 
 Set `PUBLIC_API_URL` in `.env` (see `.env.example`) to point at the API base URL.
