@@ -31,9 +31,7 @@
 
 	const inputsSummary = $derived(snippet(trial.example.inputs, 60));
 	const outputSummary = $derived(
-		trial.status === 'failed'
-			? trial.error?.message ?? 'Failed'
-			: snippet(trial.output, 60)
+		trial.status === 'failed' ? (trial.error?.message ?? 'Failed') : snippet(trial.output, 60)
 	);
 </script>
 

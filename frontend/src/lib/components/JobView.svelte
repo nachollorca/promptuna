@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { EventStoreState } from '$lib/types';
 	import AggregateBar from './AggregateBar.svelte';
 	import StepSection from './StepSection.svelte';
@@ -12,19 +13,17 @@
 
 	let { store }: Props = $props();
 
-	let expandedTrials = $state(new Set<string>());
+	let expandedTrials = new SvelteSet<string>();
 
 	const complete = $derived(store.status === 'done' || store.status === 'error');
 	const kind = $derived(store.manifest?.kind);
 
 	function toggleTrial(trialId: string) {
-		const next = new Set(expandedTrials);
-		if (next.has(trialId)) {
-			next.delete(trialId);
+		if (expandedTrials.has(trialId)) {
+			expandedTrials.delete(trialId);
 		} else {
-			next.add(trialId);
+			expandedTrials.add(trialId);
 		}
-		expandedTrials = next;
 	}
 
 	function previousScore(index: number): number | null {

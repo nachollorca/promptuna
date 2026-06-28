@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { fetchJobs } from '$lib/api';
 	import type { JobListItem } from '$lib/types';
 
@@ -46,7 +47,9 @@
 			<tbody>
 				{#each jobs as job (job.job_id)}
 					<tr>
-						<td><a href="/jobs/{job.job_id}">{job.job_id.slice(0, 8)}…</a></td>
+						<td
+							><a href={resolve('/jobs/[id]', { id: job.job_id })}>{job.job_id.slice(0, 8)}…</a></td
+						>
 						<td>{job.kind}</td>
 						<td><span class="badge {job.status}">{job.status}</span></td>
 						<td>{job.project}</td>

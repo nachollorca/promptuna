@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import '../app.css';
 
 	let { children } = $props();
@@ -6,10 +7,10 @@
 
 <div class="app-shell">
 	<header class="app-header">
-		<h1><a href="/">Promptuna</a></h1>
+		<h1><a href={resolve('/')}>Promptuna</a></h1>
 		<nav>
-			<a href="/">New job</a>
-			<a href="/jobs">Jobs</a>
+			<a href={resolve('/')}>New job</a>
+			<a href={resolve('/jobs')}>Jobs</a>
 		</nav>
 	</header>
 	<main class="app-main">

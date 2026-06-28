@@ -6,8 +6,7 @@ import type {
 	LiveAggregates,
 	ScoringPayload,
 	StepSection,
-	TrialPayload,
-	TrialWithScorings
+	TrialPayload
 } from '$lib/types';
 
 function emptyAggregates(): LiveAggregates {

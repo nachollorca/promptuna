@@ -1,12 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		ApiError,
-		fetchCatalog,
-		startEvaluate,
-		startOptimize,
-		startRun
-	} from '$lib/api';
+	import { ApiError, fetchCatalog, startEvaluate, startOptimize, startRun } from '$lib/api';
 	import type {
 		CatalogProject,
 		CatalogResponse,
@@ -15,7 +9,12 @@
 		OptimizeRequest,
 		RunRequest
 	} from '$lib/types';
-	import { loadRecentModels, loadRecentProposerModels, rememberModel, rememberProposerModel } from '$lib/recentModels';
+	import {
+		loadRecentModels,
+		loadRecentProposerModels,
+		rememberModel,
+		rememberProposerModel
+	} from '$lib/recentModels';
 
 	interface Props {
 		disabled?: boolean;
@@ -41,9 +40,7 @@
 	let proposerModel = $state('');
 	let selectedMetrics = $state<string[]>([]);
 
-	const selectedProject = $derived(
-		catalog?.projects.find((p) => p.name === projectName) ?? null
-	);
+	const selectedProject = $derived(catalog?.projects.find((p) => p.name === projectName) ?? null);
 
 	onMount(async () => {
 		const recent = loadRecentModels();
@@ -149,7 +146,8 @@
 			onStarted(buildManifest(jobId));
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 409) {
-				submitError = 'Another job is already running. Wait for it to finish or open the jobs list.';
+				submitError =
+					'Another job is already running. Wait for it to finish or open the jobs list.';
 				onConflict?.();
 			} else {
 				submitError = err instanceof Error ? err.message : String(err);

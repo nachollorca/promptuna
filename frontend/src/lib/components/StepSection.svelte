@@ -39,7 +39,11 @@
 		<div class="proposal-block">
 			<h4>Proposal</h4>
 			{#if step.proposal.thinking}
-				<button type="button" class="thinking-toggle" onclick={() => (thinkingOpen = !thinkingOpen)}>
+				<button
+					type="button"
+					class="thinking-toggle"
+					onclick={() => (thinkingOpen = !thinkingOpen)}
+				>
 					{thinkingOpen ? '▼' : '▶'} Proposer thinking
 				</button>
 				{#if thinkingOpen}

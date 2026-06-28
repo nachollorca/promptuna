@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import type { JobManifest } from '$lib/types';
 
 	interface Props {
@@ -76,7 +77,7 @@
 				<button type="button" class="btn btn-ghost" onclick={copyJobId}>
 					{copied ? 'Copied' : 'Copy'}
 				</button>
-				<a href="/jobs/{manifest.job_id}">Replay</a>
+				<a href={resolve('/jobs/[id]', { id: manifest.job_id })}>Replay</a>
 			</div>
 		</div>
 		<div>

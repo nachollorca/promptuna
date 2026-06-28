@@ -26,6 +26,22 @@ update-hooks:
 run-hooks:
     prek run --show-diff-on-failure --color=always -a
 
+# Frontend --------------------------------------------------------------------
+frontend-install:
+    npm ci --prefix frontend
+
+frontend-format:
+    npm run format --prefix frontend
+    npm run lint:fix --prefix frontend
+
+frontend-check:
+    npm run check --prefix frontend
+    npm run lint --prefix frontend
+    npm run format:check --prefix frontend
+
+frontend-build:
+    npm run build --prefix frontend
+
 # Code quality ----------------------------------------------------------------
 format *paths=".":
     uv run --frozen ruff check --fix {{ paths }}

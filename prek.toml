@@ -64,3 +64,21 @@ name = "check-complexity"
 entry = "just check-complexity"
 language = "system"
 types = ["python"]
+
+# Format: prettier + eslint --fix
+[[repos.hooks]]
+id = "frontend-format"
+name = "frontend-format"
+entry = "just frontend-format"
+language = "system"
+files = "^frontend/"
+pass_filenames = false
+
+# Type check, lint, and format verification
+[[repos.hooks]]
+id = "frontend-check"
+name = "frontend-check"
+entry = "just frontend-check"
+language = "system"
+files = "^frontend/"
+pass_filenames = false

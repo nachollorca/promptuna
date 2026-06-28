@@ -60,7 +60,8 @@
 			</div>
 			{#if summary.best_step}
 				<div class="best-step">
-					<strong>Best step:</strong> {summary.best_step.step_index} — score
+					<strong>Best step:</strong>
+					{summary.best_step.step_index} — score
 					{summary.best_step.score.toFixed(3)}
 				</div>
 			{/if}

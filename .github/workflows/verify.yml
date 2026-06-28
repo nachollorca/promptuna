@@ -1,6 +1,6 @@
 # This workflow runs all per-file checks (via prek) and the test suite for every push.
 # prek.toml is the single source of truth for hook versions and per-file checks;
-# this workflow only orchestrates `prek run --all-files` and `just test`.
+# this workflow orchestrates `prek run --all-files`, `just test`, and `just frontend-build`.
 
 name: verify
 
@@ -36,8 +36,21 @@ jobs:
       - name: Install the project (frozen)
         run: just install
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies (frozen)
+        run: just frontend-install
+
       - name: Run prek hooks
         uses: j178/prek-action@v1
 
       - name: Run tests
         run: just test
+
+      - name: Build frontend
+        run: just frontend-build
