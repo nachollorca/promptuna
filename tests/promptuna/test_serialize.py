@@ -158,6 +158,32 @@ def test_serialize_step_without_thinking(experiment, examples, exact_match_metri
     _assert_json_roundtrip(event)
 
 
+def test_serialize_proposal():
+    proposal = Proposal(
+        thinking=_sample_thinking(),
+        prompt_template="Answer: {{ question }}",
+    )
+
+    event = serialize_event(proposal, job_id="run-1", seq=0, step_index=1)
+
+    assert event["type"] == "proposal"
+    assert event["step_index"] == 1
+    assert event["payload"]["prompt_template"] == "Answer: {{ question }}"
+    assert event["payload"]["thinking"]["edit_plan"] == (
+        "Refine best checkpoint; tighten scoring criteria."
+    )
+    _assert_json_roundtrip(event)
+
+
+def test_serialize_proposal_without_thinking():
+    proposal = Proposal(thinking=None, prompt_template="baseline")
+
+    event = serialize_event(proposal, job_id="run-1", seq=0, step_index=0)
+
+    assert event["payload"]["thinking"] is None
+    _assert_json_roundtrip(event)
+
+
 def test_serialize_output_schema_in_trial_telemetry(experiment, example):
     trial = make_trial(example, output_schema=_BlockSchema)
 
@@ -202,12 +228,10 @@ def test_stream_optimize_events_are_json_serializable(
                 proposer=proposer,
             )
         ):
+            event = serialize_event(item, job_id="test-run", seq=seq, step_index=step_index)
             if isinstance(item, Step):
-                event = serialize_event(item, job_id="test-run", seq=seq, step_index=step_index)
                 step_index += 1
-            else:
-                event = serialize_event(item, job_id="test-run", seq=seq, step_index=step_index)
             _assert_json_roundtrip(event)
-            assert event["type"] in {"trial", "scoring", "step"}
+            assert event["type"] in {"trial", "scoring", "step", "proposal"}
 
         assert step_index == 2

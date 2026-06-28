@@ -15,11 +15,13 @@ from promptuna.jobs import (
     fold_summary,
     get_jobs_root,
     list_job_ids,
+    list_job_manifests,
     load_job,
     sha256_file,
     stream_job,
 )
-from promptuna.optimize import Step, Thinking
+from promptuna.optimize import Proposal, Step, Thinking
+from promptuna.program import Example
 from promptuna.projects import set_projects_root
 from promptuna.run import FailedTrial
 from promptuna.serialize import serialize_error, serialize_event
@@ -149,6 +151,17 @@ def test_list_job_ids_orders_newest_first(workspace_root: Path, job_config: JobC
     assert list_job_ids(jobs_root) == ["newer", "older"]
 
 
+def test_list_job_manifests_matches_job_ids(workspace_root: Path, job_config: JobConfig):
+    jobs_root = get_jobs_root()
+    archive = JobArchive.open(jobs_root, "job-1", job_config)
+    archive.finalize("done")
+
+    manifests = list_job_manifests(jobs_root)
+
+    assert len(manifests) == 1
+    assert manifests[0]["job_id"] == "job-1"
+
+
 def test_archive_survives_reload(workspace_root: Path, job_config: JobConfig, example):
     archive = JobArchive.open(get_jobs_root(), "job-1", job_config)
     archive.append_event(serialize_event(make_trial(example), job_id="job-1", seq=0, step_index=0))
@@ -217,6 +230,42 @@ def test_stream_job_records_errors(workspace_root: Path, job_config: JobConfig, 
     assert record.events[-1]["type"] == "error"
     assert record.summary is not None
     assert record.summary["status"] == "error"
+
+
+def test_stream_job_proposal_uses_step_index_without_advancing(
+    workspace_root: Path,
+    job_config: JobConfig,
+):
+    job_config = JobConfig(
+        kind="optimize",
+        projects_root=job_config.projects_root,
+        project=job_config.project,
+        program=job_config.program,
+        prompt=job_config.prompt,
+        examples=job_config.examples,
+        dataset_path=job_config.dataset_path,
+        model=job_config.model,
+        workers=job_config.workers,
+        metrics=job_config.metrics,
+        steps=1,
+        proposer_model="test:model",
+    )
+    archive = JobArchive.open(get_jobs_root(), "job-proposal", job_config)
+    proposal = Proposal(thinking=None, prompt_template="Better: {{ question }}")
+
+    def source():
+        yield proposal
+        yield make_trial(
+            Example(inputs={"question": "2+2?"}, reference="4"),
+            output="4",
+        )
+
+    envelopes = list(stream_job(archive, source()))
+
+    assert envelopes[0]["type"] == "proposal"
+    assert envelopes[0]["step_index"] == 0
+    assert envelopes[1]["type"] == "trial"
+    assert envelopes[1]["step_index"] == 0
 
 
 def test_stream_job_advances_optimize_step_index(

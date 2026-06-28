@@ -259,11 +259,12 @@ def stream_optimize(
     steps: int,
     proposer: Proposer = default_proposer,
     workers: int = 1,
-) -> Iterator[Trial | Scoring | Step]:
+) -> Iterator[Trial | Scoring | Step | Proposal]:
     """Search for a higher-scoring prompt template, yielding progress as it lands.
 
-    Yields a tagged union of three kinds of items:
+    Yields a tagged union of four kinds of items:
 
+    - :class:`Proposal` — the prompt template about to be evaluated for a step.
     - :class:`~promptuna.run.Trial` — one program run for the current checkpoint.
     - :class:`~promptuna.evaluate.Scoring` — one metric applied to a trial.
     - :class:`Step` — the aggregated checkpoint once every trial and scoring for
@@ -271,17 +272,18 @@ def stream_optimize(
 
     Ordering contract:
 
-    1. Items for a step are contiguous: all of its trials and scorings, then
-       exactly one :class:`Step`.
+    1. Each step begins with exactly one :class:`Proposal`, then all of its
+       trials and scorings, then exactly one :class:`Step`.
     2. Within a step, trial/scoring order matches :func:`stream_evaluate`
        (completion order; each trial before its scorings).
-    3. Between steps the proposer runs synchronously and emits nothing.
+    3. Between steps the proposer runs synchronously and emits nothing until the
+       next :class:`Proposal`.
     4. The stream ends after the last :class:`Step` (early stop when a
        checkpoint scores perfectly is reflected in which steps appear).
 
     To track which step a trial or scoring belongs to, count :class:`Step`
     events already yielded — that is the index of the in-flight step. The
-    :class:`Step` event itself carries the same index.
+    :class:`Proposal` and :class:`Step` for a step share that index.
 
     All items are yielded on the consumer thread (the thread iterating this
     generator), even though evaluation runs in a thread pool internally.
@@ -291,6 +293,7 @@ def stream_optimize(
 
     archive: list[Step] = []
 
+    yield Proposal(thinking=None, prompt_template=experiment.prompt_template)
     for event in _stream_step(
         experiment=experiment,
         examples=examples,
@@ -307,6 +310,7 @@ def stream_optimize(
         if archive[-1].score >= 1.0:
             break
         proposal = proposer(steps=archive, model=proposer_model)
+        yield proposal
         candidate_experiment = replace(experiment, prompt_template=proposal.prompt_template)
         for event in _stream_step(
             experiment=candidate_experiment,

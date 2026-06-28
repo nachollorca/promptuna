@@ -19,6 +19,9 @@ from promptuna_server import jobs
 from promptuna_server.schemas import (
     CatalogResponse,
     EvaluateRequest,
+    JobDetailResponse,
+    JobListItemResponse,
+    JobListResponse,
     JobStartResponse,
     OptimizeRequest,
     ProjectCatalogResponse,
@@ -91,6 +94,48 @@ def catalog() -> CatalogResponse:
             )
             for entry in workspace.projects
         ],
+    )
+
+
+def _manifest_to_list_item(manifest: dict) -> JobListItemResponse:
+    return JobListItemResponse(
+        job_id=manifest["job_id"],
+        kind=manifest["kind"],
+        status=manifest["status"],
+        started_at=manifest["started_at"],
+        finished_at=manifest.get("finished_at"),
+        project=manifest["project"],
+        program=manifest["program"],
+        prompt=manifest["prompt"],
+        examples=manifest["examples"],
+        model=manifest["model"],
+        workers=manifest["workers"],
+        metrics=manifest.get("metrics"),
+        steps=manifest.get("steps"),
+        proposer_model=manifest.get("proposer_model"),
+        error=manifest.get("error"),
+    )
+
+
+@app.get("/jobs", response_model=JobListResponse)
+def list_jobs() -> JobListResponse:
+    """List persisted jobs under the active projects root."""
+    manifests = jobs.list_jobs()
+    return JobListResponse(jobs=[_manifest_to_list_item(manifest) for manifest in manifests])
+
+
+@app.get("/jobs/{job_id}", response_model=JobDetailResponse)
+def get_job(job_id: str) -> JobDetailResponse:
+    """Return manifest, events, and optional summary for one job."""
+    try:
+        record = jobs.load_job_detail(job_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found") from exc
+
+    return JobDetailResponse(
+        manifest=record.manifest,
+        events=record.events,
+        summary=record.summary,
     )
 
 

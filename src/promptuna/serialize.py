@@ -1,6 +1,6 @@
 """Serialize streaming job events to JSON-safe envelopes.
 
-Each yielded ``Trial``, ``Scoring``, or ``Step`` is wrapped in a stable envelope
+Each yielded ``Trial``, ``Scoring``, ``Step``, or ``Proposal`` is wrapped in a stable envelope
 suitable for SSE transport, on-disk job persistence (:mod:`promptuna.jobs`), and
 unit tests. Fatal job failures use :func:`serialize_error`. Callers assign ``seq``
 and ``step_index`` as events are emitted. ``step`` events appear only on optimize
@@ -22,15 +22,15 @@ from promptuna.evaluate import (
     Scoring,
     SuccessfulScoring,
 )
-from promptuna.optimize import Step
+from promptuna.optimize import Proposal, Step
 from promptuna.program import Example
 from promptuna.run import FailedTrial, SuccessfulTrial, Trial
 
-EventType = Literal["trial", "scoring", "step", "error"]
+EventType = Literal["trial", "scoring", "step", "proposal", "error"]
 
 
 def serialize_event(
-    event: Trial | Scoring | Step,
+    event: Trial | Scoring | Step | Proposal,
     *,
     job_id: str,
     seq: int,
@@ -46,6 +46,9 @@ def serialize_event(
     elif isinstance(event, Step):
         event_type = "step"
         payload = _serialize_step(event)
+    elif isinstance(event, Proposal):
+        event_type = "proposal"
+        payload = _serialize_proposal(event)
     else:
         raise TypeError(f"unsupported event type: {type(event)!r}")
 
@@ -210,6 +213,13 @@ def _serialize_scoring(scoring: Scoring) -> dict[str, Any]:
 
 def _serialize_aggregate(aggregate: Any) -> dict[str, float | int]:
     return {"mean": aggregate.mean, "sd": aggregate.sd, "n": aggregate.n}
+
+
+def _serialize_proposal(proposal: Proposal) -> dict[str, Any]:
+    return {
+        "prompt_template": proposal.prompt_template,
+        "thinking": proposal.thinking.model_dump() if proposal.thinking is not None else None,
+    }
 
 
 def _serialize_step(step: Step) -> dict[str, Any]:
