@@ -11,14 +11,26 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from promptuna.evaluate import Metric, Scoring, stream_evaluate
-from promptuna.jobs import JobArchive, JobConfig, JobKind, JobStatus, get_jobs_root, stream_job
-from promptuna.optimize import Step, stream_optimize
+from promptuna.jobs import (
+    JobArchive,
+    JobConfig,
+    JobKind,
+    JobRecord,
+    JobStatus,
+    get_jobs_root,
+    list_job_manifests,
+    load_job,
+    load_manifest,
+    load_summary,
+    stream_job,
+)
+from promptuna.optimize import Proposal, Step, stream_optimize
 from promptuna.program import Example, Experiment
 from promptuna.run import Trial, stream_run
 
 _WAIT_TIMEOUT_SECONDS = 1.0
 
-StreamSource = Callable[[], Iterator[Trial | Scoring | Step]]
+StreamSource = Callable[[], Iterator[Trial | Scoring | Step | Proposal]]
 
 
 @dataclass
@@ -180,3 +192,20 @@ def reset_jobs() -> None:
     """Clear all jobs (tests only)."""
     with _jobs_lock:
         _jobs.clear()
+
+
+def list_jobs() -> list[dict[str, Any]]:
+    """Return manifests for all on-disk jobs, newest-first."""
+    return list_job_manifests(get_jobs_root())
+
+
+def load_job_detail(job_id: str) -> JobRecord:
+    """Load a job from memory when active, otherwise from disk."""
+    try:
+        job = get_job(job_id)
+    except JobNotFoundError:
+        return load_job(get_jobs_root(), job_id)
+
+    manifest = load_manifest(job.archive.job_dir)
+    summary = None if job.status == "running" else load_summary(job.archive.job_dir)
+    return JobRecord(manifest=manifest, events=list(job.events), summary=summary)

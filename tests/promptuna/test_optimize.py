@@ -238,7 +238,7 @@ def test_optimize_stops_early_when_score_is_perfect(
     assert calls["n"] == 0
 
 
-def test_stream_optimize_yields_trials_scorings_then_step(
+def test_stream_optimize_yields_proposal_trials_scorings_then_step(
     experiment, examples, exact_match_metric, fake_complete_factory
 ):
     with fake_complete_factory("wrong"):
@@ -252,10 +252,11 @@ def test_stream_optimize_yields_trials_scorings_then_step(
             )
         )
 
-    assert len(items) == 3
-    assert isinstance(items[0], SuccessfulTrial)
-    assert isinstance(items[1], SuccessfulScoring)
-    assert isinstance(items[2], Step)
+    assert len(items) == 4
+    assert isinstance(items[0], Proposal)
+    assert isinstance(items[1], SuccessfulTrial)
+    assert isinstance(items[2], SuccessfulScoring)
+    assert isinstance(items[3], Step)
 
 
 def test_stream_optimize_rejects_negative_steps(experiment, examples, exact_match_metric):
@@ -326,9 +327,39 @@ def test_stream_optimize_step_index_from_step_count(
             proposer=proposer,
         ):
             if isinstance(event, Step):
-                assert completed_steps == 0 or completed_steps == 1
+                assert completed_steps in {0, 1}
                 completed_steps += 1
+            elif isinstance(event, Proposal):
+                assert completed_steps in {0, 1}
             else:
                 assert completed_steps in {0, 1}
 
         assert completed_steps == 2
+
+
+def test_stream_optimize_emits_proposal_before_each_step_trials(
+    experiment, examples, exact_match_metric, fake_complete_factory
+):
+    def proposer(steps, model):
+        return Proposal(thinking=None, prompt_template="Improved: {{ question }}")
+
+    with fake_complete_factory("wrong"):
+        items = list(
+            stream_optimize(
+                experiment=experiment,
+                examples=examples[:1],
+                metrics=[exact_match_metric],
+                proposer_model=experiment.model,
+                steps=1,
+                proposer=proposer,
+            )
+        )
+
+    proposal_indexes = [index for index, item in enumerate(items) if isinstance(item, Proposal)]
+    trial_indexes = [index for index, item in enumerate(items) if isinstance(item, SuccessfulTrial)]
+
+    assert proposal_indexes == [0, 4]
+    assert all(
+        proposal_index < trial_index
+        for proposal_index, trial_index in zip(proposal_indexes, trial_indexes[:2], strict=True)
+    )

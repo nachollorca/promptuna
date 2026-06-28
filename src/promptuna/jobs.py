@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from promptuna.evaluate import Scoring
-from promptuna.optimize import Step
+from promptuna.optimize import Proposal, Step
 from promptuna.projects import get_projects_root
 from promptuna.run import Trial
 from promptuna.serialize import serialize_error, serialize_event
@@ -54,7 +54,7 @@ def get_library_jobs_root() -> Path:
 
 def stream_job(
     archive: JobArchive,
-    source: Iterator[Trial | Scoring | Step],
+    source: Iterator[Trial | Scoring | Step | Proposal],
 ) -> Iterator[dict[str, Any]]:
     """Persist one streaming job and yield serialized event envelopes.
 
@@ -73,14 +73,12 @@ def stream_job(
     step_index = 0
     try:
         for item in source:
-            if isinstance(item, Step):
-                envelope = serialize_event(item, job_id=job_id, seq=seq, step_index=step_index)
-                step_index += 1
-            else:
-                envelope = serialize_event(item, job_id=job_id, seq=seq, step_index=step_index)
+            envelope = serialize_event(item, job_id=job_id, seq=seq, step_index=step_index)
             archive.append_event(envelope)
             yield envelope
             seq += 1
+            if isinstance(item, Step):
+                step_index += 1
         archive.finalize("done")
     except Exception as exc:
         error_envelope = serialize_error(
@@ -298,6 +296,11 @@ def list_job_ids(jobs_root: Path) -> list[str]:
 
     jobs.sort(reverse=True)
     return [job_id for _, job_id in jobs]
+
+
+def list_job_manifests(jobs_root: Path) -> list[dict[str, Any]]:
+    """Return manifests for all on-disk jobs, newest-first."""
+    return [load_manifest(jobs_root / job_id) for job_id in list_job_ids(jobs_root)]
 
 
 def fold_summary(events: list[dict[str, Any]], manifest: dict[str, Any]) -> dict[str, Any]:

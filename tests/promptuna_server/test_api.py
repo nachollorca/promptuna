@@ -201,13 +201,18 @@ def test_optimize_streams_checkpoint_events(client: TestClient, fake_complete_fa
         events = _wait_for_events(client, job_id)
 
     types = [event["type"] for event in events]
+    assert "proposal" in types
     assert "trial" in types
     assert "scoring" in types
     assert "step" in types
-    assert types.index("step") > types.index("trial")
+    assert types.index("proposal") < types.index("trial")
+    assert types.index("trial") < types.index("step")
 
     step_indices = [event["step_index"] for event in events if event["type"] == "step"]
     assert step_indices == [0, 1]
+
+    proposal_indices = [event["step_index"] for event in events if event["type"] == "proposal"]
+    assert proposal_indices == [0, 1]
 
 
 def test_unknown_job_events_returns_404(client: TestClient):
@@ -255,3 +260,58 @@ def test_late_sse_subscriber_replays_completed_job(client: TestClient, fake_comp
 
     second_events = _wait_for_events(client, job_id)
     assert second_events == first_events
+
+
+def test_list_jobs_returns_persisted_manifests(client: TestClient, fake_complete_patch):
+    start = client.post(
+        "/run",
+        json={
+            "project": "test_project",
+            "program": "echo",
+            "prompt": "baseline",
+            "model": "test:model",
+            "examples": "dev",
+            "workers": 1,
+        },
+    )
+    job_id = start.json()["job_id"]
+    _wait_for_events(client, job_id)
+
+    response = client.get("/jobs")
+    assert response.status_code == 200
+    item = next(item for item in response.json()["jobs"] if item["job_id"] == job_id)
+    assert item["kind"] == "run"
+    assert item["status"] == "done"
+    assert item["project"] == "test_project"
+
+
+def test_get_job_returns_manifest_events_and_summary(client: TestClient, fake_complete_patch):
+    start = client.post(
+        "/evaluate",
+        json={
+            "project": "test_project",
+            "program": "echo",
+            "prompt": "baseline",
+            "model": "test:model",
+            "examples": "dev",
+            "metrics": ["exact_match"],
+            "workers": 1,
+        },
+    )
+    job_id = start.json()["job_id"]
+    events = _wait_for_events(client, job_id)
+
+    response = client.get(f"/jobs/{job_id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["manifest"]["job_id"] == job_id
+    assert body["manifest"]["kind"] == "evaluate"
+    assert body["events"] == events
+    assert body["summary"] is not None
+    trial_events = [event for event in events if event["type"] == "trial"]
+    assert body["summary"]["trial_count"] == len(trial_events)
+
+
+def test_get_unknown_job_returns_404(client: TestClient):
+    response = client.get("/jobs/does-not-exist")
+    assert response.status_code == 404
