@@ -110,29 +110,49 @@
 <style>
 	.summary-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 0.65rem 1rem;
-		font-size: 0.875rem;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: var(--space-md);
+		font-size: 14px;
+		line-height: 20px;
+	}
+
+	.summary-grid > div {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.summary-grid strong {
+		font-family: var(--font-mono);
+		font-size: 20px;
+		font-weight: 600;
+		color: var(--text);
 	}
 
 	.label {
-		display: block;
-		font-size: 0.75rem;
-		color: var(--muted);
-		margin-bottom: 0.1rem;
+		margin-bottom: 0;
 	}
 
 	.partial {
 		color: var(--muted);
-		font-size: 0.8125rem;
-		margin-left: 0.25rem;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		margin-left: var(--space-xs);
 	}
 
 	.best-step {
-		margin-top: 0.75rem;
-		padding: 0.6rem 0.75rem;
-		background: #edf9f1;
-		border-radius: 6px;
-		font-size: 0.875rem;
+		margin-top: var(--space-md);
+		padding: var(--space-sm) var(--space-md);
+		background: var(--success-bg);
+		border: 1px solid var(--success);
+		color: var(--success);
+		font-family: var(--font-mono);
+		font-size: 13px;
+	}
+
+	.best-step strong {
+		font-weight: 600;
 	}
 </style>

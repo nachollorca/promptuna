@@ -220,7 +220,14 @@
 			</div>
 			<div class="field">
 				<label for="model">Model</label>
-				<input id="model" type="text" bind:value={model} placeholder="provider:model-id" required />
+				<input
+					id="model"
+					class="mono"
+					type="text"
+					bind:value={model}
+					placeholder="provider:model-id"
+					required
+				/>
 			</div>
 			<div class="field">
 				<label for="workers">Workers</label>
@@ -236,6 +243,7 @@
 					<label for="proposer">Proposer model</label>
 					<input
 						id="proposer"
+						class="mono"
 						type="text"
 						bind:value={proposerModel}
 						placeholder="provider:model-id"
@@ -280,36 +288,50 @@
 <style>
 	.operation-toggle {
 		display: flex;
-		gap: 0.35rem;
-		margin-bottom: 1rem;
+		gap: 0;
+		margin-bottom: var(--space-md);
+		border: 1px solid var(--border);
+		width: fit-content;
 	}
 
 	.op-btn {
-		padding: 0.35rem 0.75rem;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: #fff;
-		text-transform: capitalize;
+		padding: var(--space-sm) var(--space-md);
+		border: none;
+		border-right: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 12px;
+		font-weight: 500;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+	}
+
+	.op-btn:last-child {
+		border-right: none;
+	}
+
+	.op-btn:hover {
+		background: var(--surface-dim);
+		color: var(--text);
 	}
 
 	.op-btn.active {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: #fff;
-	}
-
-	.field-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: var(--muted);
+		background: var(--primary);
+		color: var(--on-primary);
 	}
 
 	.submit-row {
 		grid-column: 1 / -1;
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	.catalog-path {
-		margin: 0.75rem 0 0;
+		margin: var(--space-md) 0 0;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		letter-spacing: 0.03em;
 		word-break: break-all;
 	}
 </style>

@@ -1,43 +1,97 @@
+/* =========================================================================
+   promptuna — "Technical Precision" design system
+   See frontend/DESIGN.md. Modern Technical / Geek Chic aesthetic:
+   sharp 0px corners, tonal-layer elevation (no shadows), Slate-Navy palette,
+   Source Serif 4 headlines, Inter body, JetBrains Mono technical/data.
+   ========================================================================= */
+
 :root {
-	--bg: #f4f5f7;
-	--surface: #ffffff;
-	--border: #d8dce3;
-	--text: #1a1d24;
-	--muted: #5c6573;
-	--accent: #2f6fed;
-	--accent-hover: #1f57c7;
-	--danger: #b42318;
-	--success: #067647;
-	--radius: 8px;
-	--shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
-	font-family:
-		'Inter',
-		system-ui,
-		-apple-system,
-		sans-serif;
+	/* --- Color: Slate surface stack (tonal layers, no shadows) --- */
+	--bg: #f8fafc; /* slate-50 — app background */
+	--surface: #ffffff; /* base surface */
+	--surface-dim: #f1f5f9; /* slate-100 — active/hover surface */
+	--surface-secondary: #f8fafc; /* slate-50 — sidebars / secondary */
+	--slate-200: #e2e8f0; /* standard 1px borders */
+	--slate-300: #cbd5e1;
+	--slate-600: #475569; /* muted text */
+	--slate-700: #334155;
+	--slate-900: #0f172a; /* deep Slate Navy — text, focus, primary */
+
+	--text: var(--slate-900);
+	--muted: var(--slate-600);
+	--border: var(--slate-200);
+
+	/* --- Functional: primary (slate navy) --- */
+	--primary: #0f172a;
+	--on-primary: #ffffff;
+	--primary-hover: #1e293b;
+
+	/* --- Accents: Teal (interactive) + Purple (AI features) --- */
+	--accent-teal: #0d9488;
+	--accent-teal-bg: rgba(13, 148, 136, 0.1);
+	--accent-purple: #7c3aed;
+	--accent-purple-bg: rgba(124, 58, 237, 0.1);
+
+	/* --- Functional scoring: Green / Amber / Red (10% bg, full text) --- */
+	--success: #15803d;
+	--success-bg: rgba(21, 128, 61, 0.1);
+	--warning: #b45309;
+	--warning-bg: rgba(180, 83, 9, 0.1);
+	--danger: #b91c1c;
+	--danger-bg: rgba(185, 28, 28, 0.1);
+
+	/* --- Typography --- */
+	--font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+	--font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+
+	/* --- Spacing: 4px baseline --- */
+	--space-xs: 4px;
+	--space-sm: 8px;
+	--space-md: 16px;
+	--space-lg: 24px;
+	--space-xl: 40px;
+	--gutter: 24px;
+	--container-margin: 32px;
+
+	/* --- Faint 16x16 dot-grid for empty states / sidebars --- */
+	--dot-grid: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+	--dot-size: 16px;
+
+	font-family: var(--font-sans);
+	font-size: 16px;
+	line-height: 24px;
 	color: var(--text);
 	background: var(--bg);
-	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
 }
 
+/* --- Brutalist sharp geometry: every corner is 90deg --- */
 *,
 *::before,
 *::after {
 	box-sizing: border-box;
+	border-radius: 0 !important;
 }
 
 body {
 	margin: 0;
 	min-height: 100vh;
+	/* Subtle full-page dot-grid reinforces the technical/lab feel */
+	background-image: var(--dot-grid);
+	background-size: var(--dot-size) var(--dot-size);
+	background-position: 0 0;
 }
 
 a {
-	color: var(--accent);
+	color: var(--accent-teal);
 	text-decoration: none;
 }
 
 a:hover {
 	text-decoration: underline;
+	text-underline-offset: 2px;
 }
 
 button,
@@ -45,12 +99,26 @@ input,
 select,
 textarea {
 	font: inherit;
+	color: inherit;
 }
 
 button {
 	cursor: pointer;
 }
 
+/* Headlines → Source Serif 4 */
+h1,
+h2,
+h3 {
+	font-family: var(--font-serif);
+	font-weight: 600;
+	color: var(--text);
+	letter-spacing: -0.01em;
+}
+
+/* =========================================================================
+   App shell / layout
+   ========================================================================= */
 .app-shell {
 	min-height: 100vh;
 	display: flex;
@@ -60,112 +128,166 @@ button {
 .app-header {
 	background: var(--surface);
 	border-bottom: 1px solid var(--border);
-	padding: 0.75rem 1.25rem;
+	padding: var(--space-md) var(--container-margin);
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 1rem;
-	box-shadow: var(--shadow);
+	gap: var(--space-lg);
+	/* No shadow — depth via the 1px Slate-200 border only */
 }
 
 .app-header h1 {
 	margin: 0;
-	font-size: 1.125rem;
-	font-weight: 600;
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 32px;
+}
+
+.app-header h1 a {
+	color: var(--text);
 }
 
 .app-header nav {
 	display: flex;
-	gap: 1rem;
-	font-size: 0.9375rem;
+	gap: var(--space-lg);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.app-header nav a {
+	color: var(--muted);
+	padding: var(--space-xs) 0;
+	border-bottom: 1px solid transparent;
+}
+
+.app-header nav a:hover {
+	color: var(--text);
+	text-decoration: none;
+	border-bottom-color: var(--slate-900);
 }
 
 .app-main {
 	flex: 1;
 	width: min(1100px, 100%);
 	margin: 0 auto;
-	padding: 1.25rem;
+	padding: var(--space-xl) var(--container-margin);
 }
 
+/* =========================================================================
+   Panels (cards) — tonal layers, 1px borders, no shadows
+   ========================================================================= */
 .panel {
 	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 1rem 1.25rem;
-	box-shadow: var(--shadow);
+	padding: var(--space-lg);
+	/* Elevation = border transition, not shadow. Active/hover bumps to 2px. */
 }
 
 .panel + .panel {
-	margin-top: 1rem;
+	margin-top: var(--space-md);
 }
 
 .panel h2 {
-	margin: 0 0 0.75rem;
-	font-size: 1rem;
-	font-weight: 600;
+	margin: 0 0 var(--space-md);
+	font-size: 24px;
+	line-height: 32px;
 }
 
 .muted {
 	color: var(--muted);
-	font-size: 0.875rem;
+	font-size: 14px;
 }
 
+/* Micro-labels: JetBrains Mono, uppercase — differentiates metadata */
+.micro-label,
+.field label,
+.field-label,
+.label {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 16px;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+/* =========================================================================
+   Badges (status) — sharp, functional scoring colors at 10% opacity
+   ========================================================================= */
 .badge {
 	display: inline-flex;
 	align-items: center;
-	padding: 0.125rem 0.5rem;
-	border-radius: 999px;
-	font-size: 0.75rem;
-	font-weight: 600;
+	padding: 2px var(--space-sm);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.05em;
 	text-transform: uppercase;
-	letter-spacing: 0.03em;
+	border: 1px solid transparent;
 }
 
 .badge.running {
-	background: #e8f1ff;
-	color: #1d4ed8;
+	background: var(--accent-teal-bg);
+	color: var(--accent-teal);
+	border-color: var(--accent-teal);
 }
 
 .badge.done {
-	background: #e8f8ef;
+	background: var(--success-bg);
 	color: var(--success);
+	border-color: var(--success);
 }
 
 .badge.error {
-	background: #fdecec;
+	background: var(--danger-bg);
 	color: var(--danger);
+	border-color: var(--danger);
 }
 
+/* =========================================================================
+   Forms
+   ========================================================================= */
 .form-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-	gap: 0.75rem 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: var(--space-md);
 }
 
 .field {
 	display: flex;
 	flex-direction: column;
-	gap: 0.25rem;
-}
-
-.field label {
-	font-size: 0.8125rem;
-	font-weight: 500;
-	color: var(--muted);
+	gap: var(--space-xs);
 }
 
 .field input,
-.field select {
-	padding: 0.45rem 0.6rem;
+.field select,
+.field textarea {
+	padding: var(--space-sm) var(--space-sm);
 	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: #fff;
+	background: var(--surface);
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: 14px;
+	line-height: 20px;
 }
 
+/* Prompt editor / model fields use JetBrains Mono (technical data) */
+.field input.mono,
+.field textarea.mono {
+	font-family: var(--font-mono);
+}
+
+/* Focus: 1px Slate-200 → 2px Slate-900 (elevation via border weight) */
 .field input:focus,
-.field select:focus {
-	outline: 2px solid #bfd3ff;
-	border-color: var(--accent);
+.field select:focus,
+.field textarea:focus {
+	outline: none;
+	border-width: 2px;
+	border-color: var(--slate-900);
 }
 
 .metrics-field {
@@ -175,39 +297,90 @@ button {
 .metrics-list {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.5rem 1rem;
+	gap: var(--space-sm) var(--space-lg);
 }
 
 .metrics-list label {
 	display: flex;
 	align-items: center;
-	gap: 0.35rem;
-	font-size: 0.875rem;
+	gap: var(--space-sm);
+	font-family: var(--font-sans);
+	font-size: 14px;
 	color: var(--text);
+	text-transform: none;
+	letter-spacing: normal;
 }
 
+/* Square checkboxes/radios — brutalist consistency */
+.metrics-list input[type='checkbox'],
+.metrics-list input[type='radio'] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 16px;
+	height: 16px;
+	border: 1px solid var(--slate-300);
+	background: var(--surface);
+	display: inline-grid;
+	place-content: center;
+	cursor: pointer;
+}
+
+.metrics-list input[type='checkbox']:hover,
+.metrics-list input[type='radio']:hover {
+	border-color: var(--slate-900);
+}
+
+.metrics-list input[type='checkbox']:checked,
+.metrics-list input[type='radio']:checked {
+	background: var(--slate-900);
+	border-color: var(--slate-900);
+}
+
+.metrics-list input[type='checkbox']:checked::after {
+	content: '';
+	width: 8px;
+	height: 8px;
+	background: var(--on-primary);
+	clip-path: polygon(14% 44%, 0 60%, 50% 100%, 100% 20%, 86% 6%, 42% 62%);
+}
+
+.metrics-list input[type='radio']:checked::after {
+	content: '';
+	width: 6px;
+	height: 6px;
+	background: var(--on-primary);
+}
+
+/* =========================================================================
+   Buttons — sharp. Primary = slate navy + white. Ghost = 1px slate-200.
+   "Action" command labels use JetBrains Mono.
+   ========================================================================= */
 .btn {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 0.35rem;
-	padding: 0.5rem 1rem;
-	border-radius: 6px;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
 	border: 1px solid transparent;
+	font-family: var(--font-sans);
 	font-weight: 500;
+	font-size: 14px;
+	line-height: 20px;
 }
 
 .btn-primary {
-	background: var(--accent);
-	color: #fff;
+	background: var(--primary);
+	color: var(--on-primary);
+	border-color: var(--primary);
 }
 
 .btn-primary:hover:not(:disabled) {
-	background: var(--accent-hover);
+	background: var(--primary-hover);
+	border-color: var(--primary-hover);
 }
 
 .btn-primary:disabled {
-	opacity: 0.55;
+	opacity: 0.45;
 	cursor: not-allowed;
 }
 
@@ -217,37 +390,46 @@ button {
 	color: var(--text);
 }
 
+.btn-ghost:hover:not(:disabled) {
+	border-color: var(--slate-900);
+}
+
+/* =========================================================================
+   Banners / aggregate bar / spinner / proposing
+   ========================================================================= */
 .error-banner {
-	margin-top: 0.75rem;
-	padding: 0.6rem 0.75rem;
-	border-radius: 6px;
-	background: #fdecec;
+	margin-top: var(--space-md);
+	padding: var(--space-sm) var(--space-md);
+	background: var(--danger-bg);
 	color: var(--danger);
-	font-size: 0.875rem;
+	border: 1px solid var(--danger);
+	font-family: var(--font-mono);
+	font-size: 14px;
 }
 
 .aggregate-bar {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.75rem 1.25rem;
-	font-size: 0.875rem;
+	gap: var(--space-sm) var(--space-lg);
+	font-family: var(--font-mono);
+	font-size: 13px;
 	color: var(--muted);
-	padding: 0.75rem 0;
+	padding: var(--space-md) 0;
 	border-bottom: 1px solid var(--border);
-	margin-bottom: 0.75rem;
+	margin-bottom: var(--space-md);
 }
 
 .aggregate-bar strong {
 	color: var(--text);
+	font-weight: 600;
 }
 
 .spinner {
 	display: inline-block;
-	width: 0.9rem;
-	height: 0.9rem;
+	width: 12px;
+	height: 12px;
 	border: 2px solid var(--border);
-	border-top-color: var(--accent);
-	border-radius: 50%;
+	border-top-color: var(--accent-teal);
 	animation: spin 0.7s linear infinite;
 }
 
@@ -260,38 +442,56 @@ button {
 .proposing {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
-	padding: 0.75rem 1rem;
+	gap: var(--space-sm);
+	padding: var(--space-md);
 	color: var(--muted);
-	font-size: 0.875rem;
+	font-family: var(--font-mono);
+	font-size: 13px;
 	font-style: italic;
 }
 
+/* =========================================================================
+   Tables — zebra striping (Slate-50) for horizontal eye tracking
+   ========================================================================= */
 .job-table {
 	width: 100%;
 	border-collapse: collapse;
-	font-size: 0.875rem;
+	font-size: 14px;
+	border: 1px solid var(--border);
 }
 
 .job-table th,
 .job-table td {
 	text-align: left;
-	padding: 0.5rem 0.6rem;
+	padding: var(--space-sm) var(--space-md);
 	border-bottom: 1px solid var(--border);
 }
 
 .job-table th {
+	background: var(--surface-secondary);
 	color: var(--muted);
+	font-family: var(--font-mono);
+	font-size: 11px;
 	font-weight: 500;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
 }
 
-.job-table tr:hover td {
-	background: #f9fafb;
+.job-table tbody tr:nth-child(even) td {
+	background: var(--surface-secondary);
 }
 
+.job-table tbody tr:hover td {
+	background: var(--surface-dim);
+}
+
+/* =========================================================================
+   Mono / code
+   ========================================================================= */
 .mono {
-	font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
-	font-size: 0.8125rem;
+	font-family: var(--font-mono);
+	font-size: 13px;
+	line-height: 20px;
 	white-space: pre-wrap;
 	word-break: break-word;
 }
@@ -299,13 +499,20 @@ button {
 .copy-row {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--space-sm);
 	flex-wrap: wrap;
 }
 
 .copy-row code {
-	font-size: 0.8125rem;
-	background: #f0f2f5;
-	padding: 0.15rem 0.4rem;
-	border-radius: 4px;
+	font-family: var(--font-mono);
+	font-size: 13px;
+	background: var(--surface-dim);
+	padding: 2px var(--space-sm);
+	border: 1px solid var(--border);
+}
+
+/* Empty-state / sidebar dot-grid surface */
+.dot-grid-surface {
+	background-image: var(--dot-grid);
+	background-size: var(--dot-size) var(--dot-size);
 }

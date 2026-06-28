@@ -99,16 +99,20 @@
 <style>
 	.manifest-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-		gap: 0.65rem 1rem;
-		font-size: 0.875rem;
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		gap: var(--space-md);
+		font-size: 14px;
+		line-height: 20px;
+	}
+
+	.manifest-grid > div {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
 	}
 
 	.label {
-		display: block;
-		font-size: 0.75rem;
-		color: var(--muted);
-		margin-bottom: 0.1rem;
+		margin-bottom: 0;
 	}
 
 	.span-all {

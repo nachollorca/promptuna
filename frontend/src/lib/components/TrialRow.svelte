@@ -21,13 +21,19 @@
 	const worstScore = $derived(worstNormalizedScore(scorings));
 
 	const borderStyle = $derived.by(() => {
-		if (colorMode === 'grey') return 'border-color: #b8bec8; background: #f3f4f6';
-		if (colorMode === 'green') return 'border-color: #6bc98a; background: #edf9f1';
+		if (colorMode === 'grey') return 'border-color: var(--border); background: var(--surface-dim)';
+		if (colorMode === 'green') return 'border-color: var(--success); background: var(--success-bg)';
 		if (worstScore !== null) {
-			return `border-color: ${scoreGradient(worstScore).replace('88%', '65%')}; background: ${scoreGradient(worstScore)}`;
+			return `border-color: ${scoreGradient(worstScore).replace('88%', '55%')}; background: ${scoreGradient(worstScore).replace('88%', '92%')}`;
 		}
 		return '';
 	});
+
+	function scoreTier(normalized: number): 'green' | 'amber' | 'red' {
+		if (normalized >= 0.66) return 'green';
+		if (normalized >= 0.33) return 'amber';
+		return 'red';
+	}
 
 	const inputsSummary = $derived(snippet(trial.example.inputs, 60));
 	const outputSummary = $derived(
@@ -47,11 +53,15 @@
 			<span class="score-chips">
 				{#each scorings as scoring (scoring.metric.name + scoring.replicate)}
 					{#if scoring.status === 'success' && scoring.score}
-						<span class="chip" title={scoring.score.reason}>
-							{scoring.metric.name}: {scoring.score.normalized.toFixed(2)}
+						<span class="chip {scoreTier(scoring.score.normalized)}" title={scoring.score.reason}>
+							<span class="chip-metric">{scoring.metric.name}</span>
+							<span class="chip-value">{scoring.score.normalized.toFixed(2)}</span>
 						</span>
 					{:else}
-						<span class="chip failed">{scoring.metric.name}: failed</span>
+						<span class="chip failed">
+							<span class="chip-metric">{scoring.metric.name}</span>
+							<span class="chip-value">FAILED</span>
+						</span>
 					{/if}
 				{/each}
 			</span>
@@ -114,29 +124,34 @@
 <style>
 	.trial-row {
 		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		margin-bottom: 0.5rem;
+		margin-bottom: var(--space-sm);
 		overflow: hidden;
+		transition: border-width 0.05s ease;
+	}
+
+	.trial-row.expanded {
+		border-width: 2px;
 	}
 
 	.trial-header {
 		width: 100%;
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.6rem 0.75rem;
+		gap: var(--space-sm);
+		padding: var(--space-sm) var(--space-md);
 		border: none;
 		background: transparent;
 		text-align: left;
 	}
 
 	.trial-header:hover {
-		background: rgba(0, 0, 0, 0.02);
+		background: rgba(15, 23, 42, 0.03);
 	}
 
 	.chevron {
 		color: var(--muted);
-		font-size: 0.7rem;
+		font-family: var(--font-mono);
+		font-size: 10px;
 		flex-shrink: 0;
 	}
 
@@ -144,9 +159,11 @@
 		flex: 1;
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
+		gap: var(--space-sm);
 		min-width: 0;
-		font-size: 0.875rem;
+		font-family: var(--font-mono);
+		font-size: 13px;
+		line-height: 20px;
 	}
 
 	.inputs,
@@ -168,47 +185,93 @@
 	.score-chips {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.35rem;
+		gap: var(--space-xs);
 		flex-shrink: 0;
 	}
 
 	.chip {
-		font-size: 0.75rem;
-		padding: 0.1rem 0.45rem;
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.7);
-		border: 1px solid rgba(0, 0, 0, 0.08);
+		display: inline-flex;
+		align-items: baseline;
+		gap: var(--space-xs);
+		padding: 1px var(--space-sm);
+		border: 1px solid transparent;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		line-height: 16px;
+		letter-spacing: 0.03em;
 	}
 
+	.chip-metric {
+		font-weight: 500;
+		text-transform: uppercase;
+		opacity: 0.7;
+	}
+
+	.chip-value {
+		font-weight: 600;
+	}
+
+	/* Functional scoring colors: 10% bg + full-color text + border */
+	.chip.green {
+		background: var(--success-bg);
+		border-color: var(--success);
+		color: var(--success);
+	}
+
+	.chip.amber {
+		background: var(--warning-bg);
+		border-color: var(--warning);
+		color: var(--warning);
+	}
+
+	.chip.red,
 	.chip.failed {
+		background: var(--danger-bg);
+		border-color: var(--danger);
 		color: var(--danger);
 	}
 
 	.trial-detail {
-		padding: 0 0.75rem 0.75rem;
-		border-top: 1px solid rgba(0, 0, 0, 0.06);
+		padding: 0 var(--space-md) var(--space-md);
+		border-top: 1px solid var(--border);
 	}
 
 	.trial-detail section {
-		margin-top: 0.75rem;
+		margin-top: var(--space-md);
 	}
 
 	.trial-detail h4 {
-		margin: 0 0 0.35rem;
-		font-size: 0.8125rem;
+		margin: 0 0 var(--space-sm);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 500;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
 		color: var(--muted);
-		font-weight: 600;
+	}
+
+	.trial-detail pre.mono {
+		margin: 0;
+		padding: var(--space-md);
+		background: var(--surface-secondary);
+		border: 1px solid var(--border);
 	}
 
 	.telemetry-stats {
-		margin: 0.25rem 0 0;
-		padding-left: 1.1rem;
-		font-size: 0.875rem;
+		margin: var(--space-xs) 0 0;
+		padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-lg);
+		font-family: var(--font-mono);
+		font-size: 13px;
+		line-height: 22px;
+		border: 1px solid var(--border);
+		background: var(--surface-secondary);
+		list-style: square;
 	}
 
 	.error-text {
 		color: var(--danger);
 		margin: 0;
-		font-size: 0.875rem;
+		font-family: var(--font-mono);
+		font-size: 13px;
 	}
 </style>
