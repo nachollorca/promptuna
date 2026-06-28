@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.26.0 (2026-06-28)
+
+### Features
+
+- **server**: Stream proposal events and add job replay endpoints
+  ([`aceacc6`](https://github.com/nachollorca/promptuna/commit/aceacc6933bdec3085065847ed2ce56316446ff1))
+
+
 ## v1.25.1 (2026-06-27)
 
 ### Bug Fixes
