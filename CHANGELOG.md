@@ -2,6 +2,44 @@
 
 <!-- version list -->
 
+## v1.27.0 (2026-06-28)
+
+### Bug Fixes
+
+- **ci**: Set PUBLIC_API_URL in verify workflow for svelte-check
+  ([`edaaa83`](https://github.com/nachollorca/promptuna/commit/edaaa83f47148bff0a802136a3ad49978833daf1))
+
+- **frontend**: Include lib and jobs routes omitted by gitignore
+  ([`ce5cea2`](https://github.com/nachollorca/promptuna/commit/ce5cea2d934d15ee761f9e12b8f27ba4c44cf010))
+
+### Chores
+
+- **frontend**: Add ESLint, Prettier, and CI quality gates
+  ([`8d8f504`](https://github.com/nachollorca/promptuna/commit/8d8f504d9e5c2bd78176db02f62509008bb83212))
+
+### Documentation
+
+- Consolidate web surface READMEs and remove HANDOFF
+  ([`11dfc85`](https://github.com/nachollorca/promptuna/commit/11dfc85350cbf417bfd2749abf073406cdfdc949))
+
+- Restructure README for clearer navigation
+  ([`a0b2c5a`](https://github.com/nachollorca/promptuna/commit/a0b2c5adffa8c5c08e00c49b6e8cf2b094df11a4))
+
+- **frontend**: Add self-contained GUI handoff
+  ([`b3ce597`](https://github.com/nachollorca/promptuna/commit/b3ce5974c849c144832e4e241a1289b51c8d1648))
+
+### Features
+
+- Package web UI and API in a single container image
+  ([`517e259`](https://github.com/nachollorca/promptuna/commit/517e259babbea3e08917d63652f625d679cc4b2d))
+
+- **frontend**: Add SvelteKit web UI for job launch and live results
+  ([`c3b4642`](https://github.com/nachollorca/promptuna/commit/c3b4642dec4b9a53c51d45e69573a24d69f63943))
+
+- **frontend**: Apply Technical Precision design system
+  ([`a9bb459`](https://github.com/nachollorca/promptuna/commit/a9bb459e1ca6ab30e4c6139b36837bb37bca23fa))
+
+
 ## v1.26.0 (2026-06-28)
 
 ### Features
