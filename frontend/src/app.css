@@ -1,0 +1,518 @@
+/* =========================================================================
+   promptuna — "Technical Precision" design system
+   See frontend/DESIGN.md. Modern Technical / Geek Chic aesthetic:
+   sharp 0px corners, tonal-layer elevation (no shadows), Slate-Navy palette,
+   Source Serif 4 headlines, Inter body, JetBrains Mono technical/data.
+   ========================================================================= */
+
+:root {
+	/* --- Color: Slate surface stack (tonal layers, no shadows) --- */
+	--bg: #f8fafc; /* slate-50 — app background */
+	--surface: #ffffff; /* base surface */
+	--surface-dim: #f1f5f9; /* slate-100 — active/hover surface */
+	--surface-secondary: #f8fafc; /* slate-50 — sidebars / secondary */
+	--slate-200: #e2e8f0; /* standard 1px borders */
+	--slate-300: #cbd5e1;
+	--slate-600: #475569; /* muted text */
+	--slate-700: #334155;
+	--slate-900: #0f172a; /* deep Slate Navy — text, focus, primary */
+
+	--text: var(--slate-900);
+	--muted: var(--slate-600);
+	--border: var(--slate-200);
+
+	/* --- Functional: primary (slate navy) --- */
+	--primary: #0f172a;
+	--on-primary: #ffffff;
+	--primary-hover: #1e293b;
+
+	/* --- Accents: Teal (interactive) + Purple (AI features) --- */
+	--accent-teal: #0d9488;
+	--accent-teal-bg: rgba(13, 148, 136, 0.1);
+	--accent-purple: #7c3aed;
+	--accent-purple-bg: rgba(124, 58, 237, 0.1);
+
+	/* --- Functional scoring: Green / Amber / Red (10% bg, full text) --- */
+	--success: #15803d;
+	--success-bg: rgba(21, 128, 61, 0.1);
+	--warning: #b45309;
+	--warning-bg: rgba(180, 83, 9, 0.1);
+	--danger: #b91c1c;
+	--danger-bg: rgba(185, 28, 28, 0.1);
+
+	/* --- Typography --- */
+	--font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+	--font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+
+	/* --- Spacing: 4px baseline --- */
+	--space-xs: 4px;
+	--space-sm: 8px;
+	--space-md: 16px;
+	--space-lg: 24px;
+	--space-xl: 40px;
+	--gutter: 24px;
+	--container-margin: 32px;
+
+	/* --- Faint 16x16 dot-grid for empty states / sidebars --- */
+	--dot-grid: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+	--dot-size: 16px;
+
+	font-family: var(--font-sans);
+	font-size: 16px;
+	line-height: 24px;
+	color: var(--text);
+	background: var(--bg);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+/* --- Brutalist sharp geometry: every corner is 90deg --- */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	border-radius: 0 !important;
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	/* Subtle full-page dot-grid reinforces the technical/lab feel */
+	background-image: var(--dot-grid);
+	background-size: var(--dot-size) var(--dot-size);
+	background-position: 0 0;
+}
+
+a {
+	color: var(--accent-teal);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	cursor: pointer;
+}
+
+/* Headlines → Source Serif 4 */
+h1,
+h2,
+h3 {
+	font-family: var(--font-serif);
+	font-weight: 600;
+	color: var(--text);
+	letter-spacing: -0.01em;
+}
+
+/* =========================================================================
+   App shell / layout
+   ========================================================================= */
+.app-shell {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+
+.app-header {
+	background: var(--surface);
+	border-bottom: 1px solid var(--border);
+	padding: var(--space-md) var(--container-margin);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-lg);
+	/* No shadow — depth via the 1px Slate-200 border only */
+}
+
+.app-header h1 {
+	margin: 0;
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 32px;
+}
+
+.app-header h1 a {
+	color: var(--text);
+}
+
+.app-header nav {
+	display: flex;
+	gap: var(--space-lg);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.app-header nav a {
+	color: var(--muted);
+	padding: var(--space-xs) 0;
+	border-bottom: 1px solid transparent;
+}
+
+.app-header nav a:hover {
+	color: var(--text);
+	text-decoration: none;
+	border-bottom-color: var(--slate-900);
+}
+
+.app-main {
+	flex: 1;
+	width: min(1100px, 100%);
+	margin: 0 auto;
+	padding: var(--space-xl) var(--container-margin);
+}
+
+/* =========================================================================
+   Panels (cards) — tonal layers, 1px borders, no shadows
+   ========================================================================= */
+.panel {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	padding: var(--space-lg);
+	/* Elevation = border transition, not shadow. Active/hover bumps to 2px. */
+}
+
+.panel + .panel {
+	margin-top: var(--space-md);
+}
+
+.panel h2 {
+	margin: 0 0 var(--space-md);
+	font-size: 24px;
+	line-height: 32px;
+}
+
+.muted {
+	color: var(--muted);
+	font-size: 14px;
+}
+
+/* Micro-labels: JetBrains Mono, uppercase — differentiates metadata */
+.micro-label,
+.field label,
+.field-label,
+.label {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 16px;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+/* =========================================================================
+   Badges (status) — sharp, functional scoring colors at 10% opacity
+   ========================================================================= */
+.badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px var(--space-sm);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	border: 1px solid transparent;
+}
+
+.badge.running {
+	background: var(--accent-teal-bg);
+	color: var(--accent-teal);
+	border-color: var(--accent-teal);
+}
+
+.badge.done {
+	background: var(--success-bg);
+	color: var(--success);
+	border-color: var(--success);
+}
+
+.badge.error {
+	background: var(--danger-bg);
+	color: var(--danger);
+	border-color: var(--danger);
+}
+
+/* =========================================================================
+   Forms
+   ========================================================================= */
+.form-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: var(--space-md);
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.field input,
+.field select,
+.field textarea {
+	padding: var(--space-sm) var(--space-sm);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-family: var(--font-sans);
+	font-size: 14px;
+	line-height: 20px;
+}
+
+/* Prompt editor / model fields use JetBrains Mono (technical data) */
+.field input.mono,
+.field textarea.mono {
+	font-family: var(--font-mono);
+}
+
+/* Focus: 1px Slate-200 → 2px Slate-900 (elevation via border weight) */
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+	outline: none;
+	border-width: 2px;
+	border-color: var(--slate-900);
+}
+
+.metrics-field {
+	grid-column: 1 / -1;
+}
+
+.metrics-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-sm) var(--space-lg);
+}
+
+.metrics-list label {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	font-family: var(--font-sans);
+	font-size: 14px;
+	color: var(--text);
+	text-transform: none;
+	letter-spacing: normal;
+}
+
+/* Square checkboxes/radios — brutalist consistency */
+.metrics-list input[type='checkbox'],
+.metrics-list input[type='radio'] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 16px;
+	height: 16px;
+	border: 1px solid var(--slate-300);
+	background: var(--surface);
+	display: inline-grid;
+	place-content: center;
+	cursor: pointer;
+}
+
+.metrics-list input[type='checkbox']:hover,
+.metrics-list input[type='radio']:hover {
+	border-color: var(--slate-900);
+}
+
+.metrics-list input[type='checkbox']:checked,
+.metrics-list input[type='radio']:checked {
+	background: var(--slate-900);
+	border-color: var(--slate-900);
+}
+
+.metrics-list input[type='checkbox']:checked::after {
+	content: '';
+	width: 8px;
+	height: 8px;
+	background: var(--on-primary);
+	clip-path: polygon(14% 44%, 0 60%, 50% 100%, 100% 20%, 86% 6%, 42% 62%);
+}
+
+.metrics-list input[type='radio']:checked::after {
+	content: '';
+	width: 6px;
+	height: 6px;
+	background: var(--on-primary);
+}
+
+/* =========================================================================
+   Buttons — sharp. Primary = slate navy + white. Ghost = 1px slate-200.
+   "Action" command labels use JetBrains Mono.
+   ========================================================================= */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
+	border: 1px solid transparent;
+	font-family: var(--font-sans);
+	font-weight: 500;
+	font-size: 14px;
+	line-height: 20px;
+}
+
+.btn-primary {
+	background: var(--primary);
+	color: var(--on-primary);
+	border-color: var(--primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+	background: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+
+.btn-primary:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.btn-ghost {
+	background: transparent;
+	border-color: var(--border);
+	color: var(--text);
+}
+
+.btn-ghost:hover:not(:disabled) {
+	border-color: var(--slate-900);
+}
+
+/* =========================================================================
+   Banners / aggregate bar / spinner / proposing
+   ========================================================================= */
+.error-banner {
+	margin-top: var(--space-md);
+	padding: var(--space-sm) var(--space-md);
+	background: var(--danger-bg);
+	color: var(--danger);
+	border: 1px solid var(--danger);
+	font-family: var(--font-mono);
+	font-size: 14px;
+}
+
+.aggregate-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-sm) var(--space-lg);
+	font-family: var(--font-mono);
+	font-size: 13px;
+	color: var(--muted);
+	padding: var(--space-md) 0;
+	border-bottom: 1px solid var(--border);
+	margin-bottom: var(--space-md);
+}
+
+.aggregate-bar strong {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.spinner {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--border);
+	border-top-color: var(--accent-teal);
+	animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.proposing {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-md);
+	color: var(--muted);
+	font-family: var(--font-mono);
+	font-size: 13px;
+	font-style: italic;
+}
+
+/* =========================================================================
+   Tables — zebra striping (Slate-50) for horizontal eye tracking
+   ========================================================================= */
+.job-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 14px;
+	border: 1px solid var(--border);
+}
+
+.job-table th,
+.job-table td {
+	text-align: left;
+	padding: var(--space-sm) var(--space-md);
+	border-bottom: 1px solid var(--border);
+}
+
+.job-table th {
+	background: var(--surface-secondary);
+	color: var(--muted);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.job-table tbody tr:nth-child(even) td {
+	background: var(--surface-secondary);
+}
+
+.job-table tbody tr:hover td {
+	background: var(--surface-dim);
+}
+
+/* =========================================================================
+   Mono / code
+   ========================================================================= */
+.mono {
+	font-family: var(--font-mono);
+	font-size: 13px;
+	line-height: 20px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.copy-row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	flex-wrap: wrap;
+}
+
+.copy-row code {
+	font-family: var(--font-mono);
+	font-size: 13px;
+	background: var(--surface-dim);
+	padding: 2px var(--space-sm);
+	border: 1px solid var(--border);
+}
+
+/* Empty-state / sidebar dot-grid surface */
+.dot-grid-surface {
+	background-image: var(--dot-grid);
+	background-size: var(--dot-size) var(--dot-size);
+}

@@ -32,7 +32,7 @@ The loop maps directly onto the package layout:
 | Surface | When | How |
 | --- | --- | --- |
 | **Library** | You are building in Python — notebooks, apps, or custom pipelines that call the harness directly | `pip install promptuna`; wire programs, metrics, and datasets in code — [`getting_started.ipynb`](getting_started.ipynb) or [`getting_started.py`](getting_started.py) |
-| **Web** | You want HTTP clients or a browser UI to start jobs and stream progress | `pip install promptuna-server`; run with `just server` (dev checkout) or uvicorn — [`server/README.md`](server/README.md). A SvelteKit frontend is planned in [`frontend/`](frontend/). |
+| **Web** | You want HTTP clients or a browser UI to start jobs and stream progress | `pip install promptuna-server`; API — [`server/README.md`](server/README.md). Browser UI — [`frontend/README.md`](frontend/README.md). |
 | **Agent / terminal** | You work from a shell or want a coding agent to run evaluate/optimize without writing glue code | `pip install promptuna-cli`; `promptuna run --help` — project layout and agent workflows in [`cli/src/promptuna_cli/SKILL.md`](cli/src/promptuna_cli/SKILL.md) |
 
 Projects live as directories under a **projects root** (default: repo `samples/`; override with `PROMPTUNA_PROJECTS_ROOT`). Programs and metrics are Python modules on disk — they cannot be sent over HTTP as JSON — so the server and CLI resolve them locally via name selectors.
@@ -41,12 +41,12 @@ The same three operations are available on every surface:
 
 | Operation | Library | CLI | Server |
 | --- | --- | --- | --- |
-| Run | `stream_run` | `promptuna run …` | `POST /run` |
-| Evaluate | `stream_evaluate` | `promptuna evaluate …` | `POST /evaluate` |
-| Optimize | `stream_optimize` | `promptuna optimize …` | `POST /optimize` |
-| Report | `render_run`, `render_history` | `promptuna report <job_id>` | `GET /jobs/{job_id}/events` (SSE until done) |
+| Run | `stream_run` | `promptuna run …` | `POST /api/run` |
+| Evaluate | `stream_evaluate` | `promptuna evaluate …` | `POST /api/evaluate` |
+| Optimize | `stream_optimize` | `promptuna optimize …` | `POST /api/optimize` |
+| Report | `render_run`, `render_history` | `promptuna report <job_id>` | `GET /api/jobs/{job_id}/events` (SSE until done) |
 
-Server and CLI jobs persist under `<projects_root>/jobs/<job_id>/`. The server also exposes `GET /catalog` and `GET /health` — details in [`server/README.md`](server/README.md).
+Server and CLI jobs persist under `<projects_root>/jobs/<job_id>/`. Routes, SSE event shapes, and Docker deployment are documented in [`server/README.md`](server/README.md).
 
 ## Whitepaper
 
@@ -123,7 +123,7 @@ This repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/
 | `promptuna-cli` | [`cli/`](cli/) | Typer CLI for on-disk projects |
 | `promptuna-server` | [`server/`](server/) | FastAPI transport (HTTP + SSE) |
 
-A SvelteKit UI is planned in [`frontend/`](frontend/). Reference projects live in [`samples/`](samples/).
+The SvelteKit browser UI lives in [`frontend/`](frontend/) — see [`frontend/README.md`](frontend/README.md). Reference projects live in [`samples/`](samples/).
 
 ### Local setup
 
@@ -132,6 +132,8 @@ From the repository root:
 ```bash
 just install          # uv sync --frozen --all-extras --all-groups
 just server           # API on :6969 (bundled samples/ by default)
+just frontend-install # npm ci in frontend/ (once)
+just frontend-dev     # browser UI on :5173 — see frontend/README.md
 just notebook         # Jupyter Lab
 just test             # pytest with coverage
 ```
