@@ -29,7 +29,7 @@ hooks = [
 [[repos]]
 repo = "https://github.com/codespell-project/codespell"
 rev  = "v2.3.0"
-hooks = [{ id = "codespell" }]
+hooks = [{ id = "codespell", exclude = "package-lock\\.json" }]
 
 # Secret scanning -------------------------------------------------------------
 [[repos]]
