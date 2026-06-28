@@ -16,6 +16,8 @@ concurrency:
 env:
   PYTHONUNBUFFERED: "1"
   FORCE_COLOR: "1"
+  # Required for svelte-kit sync / svelte-check ($env/static/public); value unused in CI.
+  PUBLIC_API_URL: ""
 
 jobs:
   run:
