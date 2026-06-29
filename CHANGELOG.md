@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.29.0 (2026-06-29)
+
+### Features
+
+- **frontend**: Invert Start CTA colors on hover
+  ([`f2d0605`](https://github.com/nachollorca/promptuna/commit/f2d06056591221bf0e2f3e8dd5cf4156cbb020ed))
+
+
 ## v1.28.0 (2026-06-29)
 
 ### Documentation
