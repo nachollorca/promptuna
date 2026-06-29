@@ -15,6 +15,8 @@
 		rememberModel,
 		rememberProposerModel
 	} from '$lib/recentModels';
+	import Select from '$lib/components/Select.svelte';
+	import type { SelectOption } from '$lib/components/Select.svelte';
 
 	interface Props {
 		disabled?: boolean;
@@ -41,6 +43,19 @@
 	let selectedMetrics = $state<string[]>([]);
 
 	const selectedProject = $derived(catalog?.projects.find((p) => p.name === projectName) ?? null);
+
+	const projectOptions = $derived<SelectOption[]>(
+		(catalog?.projects ?? []).map((p) => ({ value: p.name, label: p.name }))
+	);
+	const programOptions = $derived<SelectOption[]>(
+		(selectedProject?.programs ?? []).map((name) => ({ value: name, label: name }))
+	);
+	const promptOptions = $derived<SelectOption[]>(
+		(selectedProject?.prompts ?? []).map((name) => ({ value: name, label: name }))
+	);
+	const datasetOptions = $derived<SelectOption[]>(
+		(selectedProject?.datasets ?? []).map((name) => ({ value: name, label: name }))
+	);
 
 	onMount(async () => {
 		const recent = loadRecentModels();
@@ -188,35 +203,24 @@
 		>
 			<div class="field">
 				<label for="project">Project</label>
-				<select id="project" bind:value={projectName} onchange={onProjectChange}>
-					{#each catalog.projects as project (project.name)}
-						<option value={project.name}>{project.name}</option>
-					{/each}
-				</select>
+				<Select
+					id="project"
+					options={projectOptions}
+					bind:value={projectName}
+					onchange={onProjectChange}
+				/>
 			</div>
 			<div class="field">
 				<label for="program">Program</label>
-				<select id="program" bind:value={program}>
-					{#each selectedProject?.programs ?? [] as name (name)}
-						<option value={name}>{name}</option>
-					{/each}
-				</select>
+				<Select id="program" options={programOptions} bind:value={program} />
 			</div>
 			<div class="field">
 				<label for="prompt">Prompt</label>
-				<select id="prompt" bind:value={prompt}>
-					{#each selectedProject?.prompts ?? [] as name (name)}
-						<option value={name}>{name}</option>
-					{/each}
-				</select>
+				<Select id="prompt" options={promptOptions} bind:value={prompt} />
 			</div>
 			<div class="field">
 				<label for="examples">Dataset</label>
-				<select id="examples" bind:value={examples}>
-					{#each selectedProject?.datasets ?? [] as name (name)}
-						<option value={name}>{name}</option>
-					{/each}
-				</select>
+				<Select id="examples" options={datasetOptions} bind:value={examples} />
 			</div>
 			<div class="field">
 				<label for="model">Model</label>

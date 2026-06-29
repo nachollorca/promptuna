@@ -290,6 +290,45 @@ h3 {
 	border-color: var(--slate-900);
 }
 
+/* =========================================================================
+   Selects — strip the OS chrome so the CLOSED control is fully on-brand,
+   and tint the native OPTION popup where the engine allows it.
+   The open <option> list is drawn by the OS, so the highlighted-item
+   background can only be steered, not fully replaced, cross-browser.
+   ========================================================================= */
+.field select {
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	/* Custom sharp chevron (Slate-600) instead of the native arrow */
+	background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%23475569' stroke-width='1.5' stroke-linecap='square'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right var(--space-sm) center;
+	padding-right: calc(var(--space-sm) * 2 + 12px);
+	cursor: pointer;
+}
+
+/* Tint native form controls (incl. the <select> highlighted/checked item
+   in Chromium 118+) with the Slate-Navy primary instead of the OS blue. */
+.field select,
+.metrics-list input[type='checkbox'],
+.metrics-list input[type='radio'] {
+	accent-color: var(--primary);
+}
+
+/* Firefox honors option background/foreground + hover/checked. */
+.field select option {
+	background: var(--surface);
+	color: var(--text);
+}
+
+.field select option:checked,
+.field select option:hover,
+.field select option:focus {
+	background: var(--surface-dim);
+	color: var(--text);
+}
+
 .metrics-field {
 	grid-column: 1 / -1;
 }
