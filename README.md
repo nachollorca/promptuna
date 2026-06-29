@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Promptuna logo" />
+</p>
+
 `promptuna` evaluates and optimizes *functions that use an LM* to accomplish a goal.
 
 In the refinement loop below, promptuna offers the primitives to define metrics that judge how well your program performs (3); the harness can then use those scores to drive automated improvements on the prompt template (4).
