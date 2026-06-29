@@ -8,7 +8,7 @@
 <div class="app-shell">
 	<header class="app-header">
 		<div class="app-brand">
-			<span class="app-eyebrow">LLM · OPTIMIZATION LAB</span>
+			<img src="/logo.png" alt="Promptuna" class="app-logo" />
 			<h1><a href={resolve('/')}>Promptuna</a></h1>
 		</div>
 		<nav>
@@ -24,18 +24,15 @@
 <style>
 	.app-brand {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
+		flex-direction: row;
+		align-items: center;
+		gap: var(--space-sm);
 	}
 
-	.app-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 11px;
-		font-weight: 500;
-		line-height: 16px;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: var(--accent-teal);
+	.app-logo {
+		height: 32px;
+		width: auto;
+		display: block;
 	}
 
 	.app-brand h1 {
