@@ -411,11 +411,17 @@ h3 {
 	background: var(--primary);
 	color: var(--on-primary);
 	border-color: var(--primary);
+	transition:
+		background-color 120ms ease,
+		border-color 120ms ease,
+		color 120ms ease;
 }
 
+/* Full inversion on hover — the primary CTA should react the loudest */
 .btn-primary:hover:not(:disabled) {
-	background: var(--primary-hover);
-	border-color: var(--primary-hover);
+	background: var(--on-primary);
+	color: var(--primary);
+	border-color: var(--primary);
 }
 
 .btn-primary:disabled {
