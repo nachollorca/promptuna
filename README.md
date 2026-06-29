@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Promptuna logo" />
+  <img src="frontend/static/logo.png" alt="Promptuna logo" />
 </p>
 
 `promptuna` evaluates and optimizes *functions that use an LM* to accomplish a goal.
