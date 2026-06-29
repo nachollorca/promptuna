@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.28.0 (2026-06-29)
+
+### Documentation
+
+- Add centered logo to README and ignore .cursor/
+  ([`b6432b1`](https://github.com/nachollorca/promptuna/commit/b6432b1e397cf740136b70e48a0b299a91d3d51a))
+
+### Features
+
+- **frontend**: Replace native selects with custom dropdown component
+  ([`2ec02d6`](https://github.com/nachollorca/promptuna/commit/2ec02d602ae10afa98016ab820365af0ba98cb6c))
+
+### Refactoring
+
+- **frontend**: Consolidate logo into frontend/static/logo.png
+  ([`b3280b2`](https://github.com/nachollorca/promptuna/commit/b3280b2381cfa0fb1f41bedad9b306671602addc))
+
+
 ## v1.27.0 (2026-06-28)
 
 ### Bug Fixes
