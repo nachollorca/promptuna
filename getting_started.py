@@ -7,8 +7,7 @@ Walk through a small but realistic example:
 2. We gather example data for the problem
 3. We define the program (function) that uses an LM to solve that problem
 4. We choose the LM and prompt that we want to test against the task
-5. We define some metrics (programmatic or LLM as a judge) that measure how well or
-   bad our program + LM + template solve the problem
+5. We define some metrics (programmatic or LLM as a judge) that measure how well or bad our program + LM + template solve the problem
 6. We run the experiment: execute the program for all the examples and score all the metrics
 7. Finally, we have an LM optimizer run the experiment, change the prompt template, and keep
    iterating to try and improve the metric scores over the examples
@@ -18,16 +17,9 @@ import os
 
 import logfire
 
-from promptuna.evaluate import (
-    LLMJudgeMetric,
-    Ordinal,
-    SuccessfulScoring,
-    default_llm_judge,
-    evaluate,
-    score_metric,
-)
+from promptuna.evaluate import SuccessfulScoring, evaluate, score_metric
 from promptuna.optimize import optimize
-from promptuna.program import Example, Experiment
+from promptuna.program import Experiment
 from promptuna.projects import (
     resolve_examples,
     resolve_metrics,
@@ -49,11 +41,15 @@ logfire.configure(
 # ## Dataset
 # The task is product review sentiment analysis: given a customer review, predict whether the
 # sentiment is positive, neutral, or negative, and produce a short justification for the call.
+# Sentiment labels are always the English strings positive, neutral, or negative — even when
+# the review itself is in another language.
 #
-# We start with a tiny labelled dataset. The `reference` is the ground-truth label.
+# We start with the partial dataset (`data/partial.jsonl`): nine labelled reviews, mostly
+# English plus one each in Spanish, German, French, and Italian. The `reference` field is the
+# ground-truth label. Later we switch to `data/full.jsonl` for the optimization section.
 
 project_dir = resolve_project_dir("classify_sentiment")
-examples = resolve_examples(project_dir, "dev")
+examples = resolve_examples(project_dir, "partial")
 
 # ## Target Function
 # Now we define the program — the thing we actually want to evaluate.
@@ -67,14 +63,15 @@ examples = resolve_examples(project_dir, "dev")
 # The function must adhere to the Program protocol: take its named inputs, the prompt template,
 # and a model id, then return whatever the downstream scorers should consume. The harness unpacks
 # Example.inputs as keyword arguments, so the parameter names must match the dict keys.
-# The program and its output schema live in samples/classify_sentiment/programs.py so the
-# optimizer can introspect them.
+# The program lives in samples/classify_sentiment/programs.py (`v1`) — keeping it in a .py
+# module (rather than defining it here) lets promptuna introspect the program source when
+# optimizing. Its output schema is declared inside the function body.
 
 classify_sentiment = resolve_program(project_dir, "v1")
 
 # ## Knobs
-# Now, lets define the moving parts under test. The two sweepable axes are the prompt template
-# and the model.
+# The two sweepable axes are the prompt template and the model. We load `prompts/baseline.jinja`,
+# which asks the model to write the reason in the same language as the review.
 
 prompt_template = resolve_prompt_template(project_dir, "baseline")
 model = "mistral:mistral-small-latest"
@@ -102,7 +99,9 @@ print("Trial output:", trial.output)
 # right artifact. We declare the value space with an Ordinal scale. See
 # samples/classify_sentiment/metrics.py for the full definition.
 
-label_correctness = resolve_metrics(project_dir, ["label_correctness"])[0]
+label_correctness, reason_language = resolve_metrics(
+    project_dir, ["label_correctness", "reason_language"]
+)
 
 # Now we score the trial against the metric.
 
@@ -111,27 +110,15 @@ assert isinstance(scoring, SuccessfulScoring)
 print("Label correctness score:", scoring.score)
 
 # ### LLM as Judge Metrics
-# The label check is cheap and exact, but it tells us nothing about the reason the model produced
-# — and a good sentiment classifier should be able to justify its call. That's a subjective,
-# open-ended judgement with no ground truth, which is exactly where an LLM judge earns its keep.
-#
-# We define an LLMJudgeMetric that grades the quality of the justification. It carries its own
-# model and judge prompt template. We use the built-in default_llm_judge, which feeds the judge
-# the rendered prompt, the program's output, the reference, and the metric description.
+# The label check is cheap and exact, but it says nothing about whether the justification is
+# written in the same language as the review. The baseline prompt asks for that; we score it
+# with an LLMJudgeMetric using the built-in default_llm_judge — the judge template is fixed,
+# and the metric description tells it what to check. See samples/classify_sentiment/metrics.py
+# as reason_language.
 
-reason_quality = LLMJudgeMetric(
-    name="reason_quality",
-    description="Rates how well the 'reason' field justifies the predicted sentiment label given the original review.",
-    scale=Ordinal(levels=["poor", "good"]),
-    scorer=default_llm_judge,
-    model="mistral:mistral-medium-latest",
-)
-
-# Let's see what the judge thinks about the system output on our first trial.
-
-judge_scoring = score_metric(trial=trial, metric=reason_quality)
-assert isinstance(judge_scoring, SuccessfulScoring)
-print("Reason quality score:", judge_scoring.score)
+language_scoring = score_metric(trial=trial, metric=reason_language)
+assert isinstance(language_scoring, SuccessfulScoring)
+print("Reason language score:", language_scoring.score)
 
 # ## Experiment
 # Finally, we can wire it all together into an experiment: run classify_sentiment against every
@@ -146,7 +133,7 @@ experiment = Experiment(
 results = evaluate(
     experiment=experiment,
     examples=examples,
-    metrics=[label_correctness, reason_quality],
+    metrics=[label_correctness, reason_language],
     workers=5,
 )
 
@@ -163,13 +150,14 @@ print("---")
 # from the full trajectory and re-scores each candidate. The archive keeps every checkpoint;
 # OptimizationResult.best is the highest-scoring step (not necessarily the last).
 #
-# In our simple example, the baseline already scores well — the five reviews above are easy, and
+# In our simple example, the baseline already scores well on the easy reviews in partial — and
 # the vague prompt ("classify the sentiment, the labels are positive / neutral / negative")
 # captures everything they need. There's nothing for the optimizer to win. To create some
-# difficulty, we extend the dataset with reviews whose correct label depends on a labelling rubric
-# the baseline prompt never states. The optimizer can only rewrite the prompt template, and it
-# sees the weakest examples plus the judge's reasoning each step — so it can infer the rubric from
-# the failures and encode it into a better prompt.
+# difficulty, we switch to the full dataset: reviews whose correct label depends on a labelling
+# rubric the baseline prompt never states, including harder English cases and more multilingual
+# reviews. The optimizer can only rewrite the prompt template, and it sees the weakest examples
+# plus the scorer reasoning each step — so it can infer the rubric from the failures and encode
+# it into a better prompt.
 #
 # What success looks like: the baseline prompt should now score noticeably below 1.0 on these
 # (conflating logistics with the product, getting fooled by sarcasm, scattering the mixed cases,
@@ -178,113 +166,12 @@ print("---")
 # reviews, and read the overall verdict not just individual adjectives" — should recover most of
 # that gap, though reaching a perfect score is harder now.
 
-ambiguous_examples = [
-    # Aspect scoping: the PRODUCT is great, only shipping/packaging is bad.
-    Example(
-        inputs={
-            "review": "Took almost a month to arrive and the box was crushed in transit, but the espresso machine itself is superb — rich crema every single morning."
-        },
-        reference="positive",
-    ),
-    # Aspect scoping: shipping/service is great, the PRODUCT is the letdown.
-    Example(
-        inputs={
-            "review": "Lightning-fast shipping and the courier was lovely, but the earbuds crackle in one ear and the battery dies within an hour. The product is a letdown."
-        },
-        reference="negative",
-    ),
-    # Sarcasm: every surface word is positive, the intent is the opposite.
-    Example(
-        inputs={
-            "review": "Oh brilliant, another 'waterproof' watch that died the first time it saw rain. Worth every penny, truly."
-        },
-        reference="negative",
-    ),
-    # Negation: positive-sounding vocabulary, flipped by 'not'.
-    Example(
-        inputs={
-            "review": "Don't believe the glowing reviews — this is not the durable, premium knife they promise. It chipped on day two."
-        },
-        reference="negative",
-    ),
-    # Neutral = genuinely mixed, real pros and cons that roughly balance.
-    Example(
-        inputs={
-            "review": "The fabric is soft and the colour is lovely, but it shrank in the first wash and the stitching is already loose. Hard to call it good or bad."
-        },
-        reference="neutral",
-    ),
-    # Neutral = purely factual, no evaluation at all.
-    Example(
-        inputs={
-            "review": "It's a 2-metre USB-C cable, black, exactly as pictured. Bought it to replace a lost one."
-        },
-        reference="neutral",
-    ),
-    # Counter-case: a minor gripe must NOT tip a clearly positive review into 'neutral'.
-    Example(
-        inputs={
-            "review": "Runs a touch warm under heavy load, but honestly this laptop is phenomenal — fast, silent, and the display is stunning. No regrets."
-        },
-        reference="positive",
-    ),
-    # Mixed but lopsided: real pros exist, yet the reviewer still recommends against buying.
-    Example(
-        inputs={
-            "review": "Looks premium and the unboxing was nice, but the firmware is buggy, key features are missing, and I already filed a return."
-        },
-        reference="negative",
-    ),
-    # Mixed but lopsided: setup friction must NOT erase a clearly positive verdict.
-    Example(
-        inputs={
-            "review": "Setup took longer than expected and the manual is confusing, yet once running it's quiet, fast, and exactly what I needed."
-        },
-        reference="positive",
-    ),
-    # Faint praise: lukewarm approval with no real enthusiasm — neutral, not positive.
-    Example(
-        inputs={
-            "review": "For a cheap desk fan it moves air. Nothing remarkable, nothing terrible — just adequate."
-        },
-        reference="neutral",
-    ),
-    # Backhanded compliment: polite wording, negative verdict about the product.
-    Example(
-        inputs={
-            "review": "I suppose it's impressive that it lasted a whole week before the handle fell off."
-        },
-        reference="negative",
-    ),
-    # Contrastive 'despite': surface positives must not outweigh a broken core product.
-    Example(
-        inputs={
-            "review": "Despite the gorgeous aesthetics and premium materials, it overheats after ten minutes and smells like burning plastic."
-        },
-        reference="negative",
-    ),
-    # Negated complaint: 'can't fault X' is mild approval of the product, not neutral.
-    Example(
-        inputs={
-            "review": "Really can't fault the battery life on this thing — easily gets through two days of heavy use."
-        },
-        reference="positive",
-    ),
-    # Aspect scoping: a great deal on a bad product is still negative.
-    Example(
-        inputs={
-            "review": "Amazing Black Friday price, but the tablet stutters, the screen flickers, and I regret keeping it."
-        },
-        reference="negative",
-    ),
-]
-
-examples = examples + ambiguous_examples
+examples = resolve_examples(project_dir, "full")
 
 optimization = optimize(
     experiment=experiment,
     examples=examples,
-    metrics=[label_correctness, reason_quality],
+    metrics=[label_correctness, reason_language],
     proposer_model="vertex:gemini-3.5-flash",
     steps=4,
     workers=5,

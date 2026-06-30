@@ -1,0 +1,27 @@
+{"inputs": {"review": "Battery lasts two full days and the screen is gorgeous. Best phone I've owned."}, "reference": "positive"}
+{"inputs": {"review": "It works. Setup was fine, nothing surprising, nothing to complain about."}, "reference": "positive"}
+{"inputs": {"review": "Stopped charging after three weeks. Support never replied. Avoid."}, "reference": "negative"}
+{"inputs": {"review": "    Camera   is   AMAZING!!!   colors pop, low-light is great.\n\n\nHighly recommend."}, "reference": "positive"}
+{"inputs": {"review": "Arrived on time. Packaging was a bit beaten up but the product itself looks ok."}, "reference": "neutral"}
+{"inputs": {"review": "Took almost a month to arrive and the box was crushed in transit, but the espresso machine itself is superb — rich crema every single morning."}, "reference": "positive"}
+{"inputs": {"review": "Lightning-fast shipping and the courier was lovely, but the earbuds crackle in one ear and the battery dies within an hour. The product is a letdown."}, "reference": "negative"}
+{"inputs": {"review": "Oh brilliant, another 'waterproof' watch that died the first time it saw rain. Worth every penny, truly."}, "reference": "negative"}
+{"inputs": {"review": "Don't believe the glowing reviews — this is not the durable, premium knife they promise. It chipped on day two."}, "reference": "negative"}
+{"inputs": {"review": "The fabric is soft and the colour is lovely, but it shrank in the first wash and the stitching is already loose. Hard to call it good or bad."}, "reference": "neutral"}
+{"inputs": {"review": "It's a 2-metre USB-C cable, black, exactly as pictured. Bought it to replace a lost one."}, "reference": "neutral"}
+{"inputs": {"review": "Runs a touch warm under heavy load, but honestly this laptop is phenomenal — fast, silent, and the display is stunning. No regrets."}, "reference": "positive"}
+{"inputs": {"review": "Looks premium and the unboxing was nice, but the firmware is buggy, key features are missing, and I already filed a return."}, "reference": "negative"}
+{"inputs": {"review": "Setup took longer than expected and the manual is confusing, yet once running it's quiet, fast, and exactly what I needed."}, "reference": "positive"}
+{"inputs": {"review": "For a cheap desk fan it moves air. Nothing remarkable, nothing terrible — just adequate."}, "reference": "neutral"}
+{"inputs": {"review": "I suppose it's impressive that it lasted a whole week before the handle fell off."}, "reference": "negative"}
+{"inputs": {"review": "Despite the gorgeous aesthetics and premium materials, it overheats after ten minutes and smells like burning plastic."}, "reference": "negative"}
+{"inputs": {"review": "Really can't fault the battery life on this thing — easily gets through two days of heavy use."}, "reference": "positive"}
+{"inputs": {"review": "Amazing Black Friday price, but the tablet stutters, the screen flickers, and I regret keeping it."}, "reference": "negative"}
+{"inputs": {"review": "La batería dura dos días enteros y la pantalla es preciosa. El mejor móvil que he tenido."}, "reference": "positive"}
+{"inputs": {"review": "Qué maravilla, otro reloj 'resistente al agua' que murió la primera vez que vio la lluvia. Vale cada céntimo, de verdad."}, "reference": "negative"}
+{"inputs": {"review": "Hat nach drei Wochen aufgehört zu laden. Der Support hat nie geantwortet. Finger weg."}, "reference": "negative"}
+{"inputs": {"review": "Zwei Meter langes USB-C-Kabel in Schwarz, genau wie abgebildet. Ersatz für ein verlorenes Exemplar."}, "reference": "neutral"}
+{"inputs": {"review": "Arrivé à l'heure. L'emballage était un peu abîmé mais le produit lui-même a l'air correct."}, "reference": "neutral"}
+{"inputs": {"review": "Ne croyez pas les avis élogieux — ce n'est pas le couteau durable et haut de gamme qu'ils promettent. Il s'est ébréché au bout de deux jours."}, "reference": "negative"}
+{"inputs": {"review": "Fotocamera fantastica!!! I colori sono vividi e funziona benissimo al buio. Consigliatissimo."}, "reference": "positive"}
+{"inputs": {"review": "La batteria dura tantissimo, ma soprattutto lo schermo è spettacolare. Nessun rimpianto."}, "reference": "positive"}

@@ -1,6 +1,12 @@
 """Metrics for the classify_sentiment reference project."""
 
-from promptuna.evaluate import Ordinal, ProgrammaticMetric, RawScore
+from promptuna.evaluate import (
+    LLMJudgeMetric,
+    Ordinal,
+    ProgrammaticMetric,
+    RawScore,
+    default_llm_judge,
+)
 from promptuna.program import Example
 
 
@@ -20,4 +26,15 @@ label_correctness = ProgrammaticMetric(
     description="Whether the predicted sentiment label matches the ground-truth label.",
     scale=Ordinal(levels=[False, True]),
     scorer=label_match,
+)
+
+reason_language = LLMJudgeMetric(
+    name="reason_language",
+    description=(
+        "Whether the reason field in the output is written in the same language as the "
+        "product review in the rendered prompt. Ignore whether the sentiment label is correct."
+    ),
+    scale=Ordinal(levels=[False, True]),
+    scorer=default_llm_judge,
+    model="mistral:mistral-medium-latest",
 )
