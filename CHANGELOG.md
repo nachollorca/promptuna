@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.31.0 (2026-06-30)
+
+### Documentation
+
+- Re-run the notebook with the new examples
+  ([`8a161df`](https://github.com/nachollorca/promptuna/commit/8a161dfdd255fd7b3502975ebfe0de5d3e02c1fb))
+
+### Features
+
+- **samples**: Refresh classify_sentiment tutorial sample
+  ([`108be79`](https://github.com/nachollorca/promptuna/commit/108be79457b6db3a423b365066a32919e707e1a9))
+
+
 ## v1.30.0 (2026-06-30)
 
 ### Features
