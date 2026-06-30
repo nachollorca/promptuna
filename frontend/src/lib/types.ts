@@ -116,6 +116,7 @@ export interface JobManifest {
 	metrics?: string[];
 	steps?: number;
 	proposer_model?: string;
+	dataset_sha256?: string;
 	error?: string | null;
 }
 
