@@ -3,3 +3,7 @@
 {"inputs": {"review": "Stopped charging after three weeks. Support never replied. Avoid."}, "reference": "negative"}
 {"inputs": {"review": "    Camera   is   AMAZING!!!   colors pop, low-light is great.\n\n\nHighly recommend."}, "reference": "positive"}
 {"inputs": {"review": "Arrived on time. Packaging was a bit beaten up but the product itself looks ok."}, "reference": "neutral"}
+{"inputs": {"review": "La batería dura dos días enteros y la pantalla es preciosa. El mejor móvil que he tenido."}, "reference": "positive"}
+{"inputs": {"review": "Hat nach drei Wochen aufgehört zu laden. Der Support hat nie geantwortet. Finger weg."}, "reference": "negative"}
+{"inputs": {"review": "Arrivé à l'heure. L'emballage était un peu abîmé mais le produit lui-même a l'air correct."}, "reference": "neutral"}
+{"inputs": {"review": "Fotocamera fantastica!!! I colori sono vividi e funziona benissimo al buio. Consigliatissimo."}, "reference": "positive"}
