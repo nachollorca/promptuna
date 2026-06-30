@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.30.0 (2026-06-30)
+
+### Features
+
+- **frontend**: Add side-by-side job comparison on Jobs tab
+  ([`20ddca4`](https://github.com/nachollorca/promptuna/commit/20ddca46d25cab1aed8b8e1901f60c257c26c8bc))
+
+
 ## v1.29.0 (2026-06-29)
 
 ### Features
