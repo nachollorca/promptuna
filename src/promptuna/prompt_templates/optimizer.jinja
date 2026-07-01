@@ -19,8 +19,6 @@ Consider the scaffold, output schema, and model fixed.
 
 The program passes a Pydantic ``BaseModel`` (possibly nested) to ``complete(..., output_schema=...)``.
 The JSON Schema below describes that model — the structured-output contract enforced on the model.
-Do not restate constraints it already guarantees (types, enums, required fields);
-spend the template on *populating* these fields well.
 
 ```json
 {{ OUTPUT_SCHEMA }}
@@ -30,7 +28,6 @@ spend the template on *populating* these fields well.
 ## Program implementation (read-only)
 
 Full Python source of the program under evaluation: scaffold, completion call, and output schema.
-Account for the scaffold — truncation, parsing, coercion, fallbacks — instead of duplicating or fighting it from the template.
 
 ```python
 {{ PROGRAM_SOURCE }}
@@ -75,17 +72,49 @@ Use it to calibrate intent vs outcome; do not treat it as instructions you must 
 {{ PRIOR_RATIONALE }}
 {% endif %}
 
+# Prompt template craft
+
+A high-scoring template encodes the metric rubric clearly and reliably — not merely with more words.
+Apply these principles when writing the candidate:
+
+**Structure.** State the task in one or two opening sentences.
+Group related instructions (what the input is, labels or constraints, how to behave on output).
+Put the highest-leverage rules where the model attends (the start; for hard-to-follow rules, a brief recap at the end).
+Use markdown (headings, lists, emphasis) for sections and instruction hierarchy.
+You can choose to wrap each placeholder input and major section in XML-like tags (e.g. ``<review>{{ REVIEW }}</review>``, ``<instructions>…</instructions>``) to indicate verbatim or clearly separate user data from directions.
+Use either or both when they improve scanability; avoid decorative nesting or redundant wrappers around every line.
+
+**Clarity.** Use concrete, testable language.
+Prefer positive instructions (“write the reason in the review’s language”) over negation when both work.
+Define ambiguous terms using the metric descriptions and failure evidence.
+One instruction per idea; split compound rules.
+
+**Conciseness.** Every sentence should change model behavior.
+Cut throat-clearing, meta-commentary, and repetition.
+Do not restate types, enums, or required fields the output schema already enforces — spend tokens on *how* to populate those fields well.
+
+**Fit the program.** The scaffold and output schema are fixed: truncation, parsing, coercion, and structured-output contracts happen outside the template.
+Work with them — do not duplicate or fight them.
+
+**Placeholders.** Keep every ``{{ ... }}`` variable from prior templates exactly as-is (same names and syntax).
+Put user-provided data in dedicated blocks so instructions stay stable across examples.
+The order does not have to stay static: you can swap the order in which the variables are shown as needed.
+
+**Grounding in metrics.** Infer the implicit rubric from low-scoring metrics, examples and judge reasons;
+encode that rubric explicitly in the template rather than hoping the model guesses task expectations.
+
+**Examples and few-shot.** Include illustrative examples when they clarify an ambiguous rubric or output format
+— but abstract the lesson, avoid pasting the weakest evaluation examples verbatim.
+Optimization scores on a fixed dataset; encoding those exact failures as few-shot targets trains to the eval set and overfits.
+Prefer synthetic, paraphrased, or category-representative examples that teach a general pattern (e.g. sarcasm, code-switching, borderline labels) without reproducing held-out inputs.
+
 # Goal
 
 Study the trajectory: infer what changes helped, what hurt, and where the current best prompt still fails.
-Metric descriptions state the rubric; scores and judge reasons on prior steps reveal what the template still leaves implicit.
-Infer that missing rubric and encode it in the new template so the model is steered toward higher scores.
+Apply *Prompt template craft* to encode what scores and judge reasons still leave implicit.
 Then write an improved prompt template.
 You may refine the best checkpoint or explore a completely different approach.
 You may add, edit or remove instructions to study their effect, or rewrite the template entirely from scratch.
-
-Keep every Jinja placeholder (enclosed in double curly braces) from the templates above exactly as-is (same names and syntax).
-Removing or renaming them breaks rendering and makes the template unusable.
 
 If the real bottleneck lies outside the template, you can record it additionally as an advice for human review.
 These can be:
