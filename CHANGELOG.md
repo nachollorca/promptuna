@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.33.0 (2026-07-01)
+
+### Features
+
+- **optimizer**: Add prompt template craft guidance
+  ([`993b0d4`](https://github.com/nachollorca/promptuna/commit/993b0d433556c040395f1d6cd73309d452cd09d4))
+
+
 ## v1.32.0 (2026-07-01)
 
 ### Features
