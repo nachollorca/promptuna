@@ -70,10 +70,10 @@ examples = resolve_examples(project_dir, "partial")
 classify_sentiment = resolve_program(project_dir, "v1")
 
 # ## Knobs
-# The two sweepable axes are the prompt template and the model. We load `prompts/baseline.jinja`,
+# The two sweepable axes are the prompt template and the model. We load `prompts/english.jinja`,
 # which asks the model to write the reason in the same language as the review.
 
-prompt_template = resolve_prompt_template(project_dir, "baseline")
+prompt_template = resolve_prompt_template(project_dir, "english")
 model = "mistral:mistral-small-latest"
 
 # ## Trial
