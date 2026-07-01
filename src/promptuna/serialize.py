@@ -219,6 +219,7 @@ def _serialize_proposal(proposal: Proposal) -> dict[str, Any]:
     return {
         "prompt_template": proposal.prompt_template,
         "thinking": proposal.thinking.model_dump() if proposal.thinking is not None else None,
+        "advice": proposal.advice,
     }
 
 
@@ -228,6 +229,7 @@ def _serialize_step(step: Step) -> dict[str, Any]:
         "score": step.score,
         "prompt_template": step.prompt_template,
         "thinking": step.thinking.model_dump() if step.thinking is not None else None,
+        "advice": step.advice,
         "summary": {
             "overall": _serialize_aggregate(result.overall),
             "per_metric": {

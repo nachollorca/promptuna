@@ -162,6 +162,7 @@ def test_serialize_proposal():
     proposal = Proposal(
         thinking=_sample_thinking(),
         prompt_template="Answer: {{ question }}",
+        advice="Expand the output schema to include confidence.",
     )
 
     event = serialize_event(proposal, job_id="run-1", seq=0, step_index=1)
@@ -169,9 +170,19 @@ def test_serialize_proposal():
     assert event["type"] == "proposal"
     assert event["step_index"] == 1
     assert event["payload"]["prompt_template"] == "Answer: {{ question }}"
+    assert event["payload"]["advice"] == "Expand the output schema to include confidence."
     assert event["payload"]["thinking"]["edit_plan"] == (
         "Refine best checkpoint; tighten scoring criteria."
     )
+    _assert_json_roundtrip(event)
+
+
+def test_serialize_proposal_without_advice():
+    proposal = Proposal(thinking=None, prompt_template="baseline")
+
+    event = serialize_event(proposal, job_id="run-1", seq=0, step_index=0)
+
+    assert event["payload"]["advice"] is None
     _assert_json_roundtrip(event)
 
 

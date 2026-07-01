@@ -18,6 +18,8 @@
 	const delta = $derived(
 		step.step && previousScore !== null ? step.step.score - previousScore : null
 	);
+
+	const advice = $derived(step.proposal?.advice ?? step.step?.advice ?? null);
 </script>
 
 <section class="step-section panel">
@@ -44,6 +46,12 @@
 	{#if step.proposal}
 		<div class="proposal-block">
 			<h4>PROPOSAL</h4>
+			{#if advice}
+				<aside class="advice-panel" role="note">
+					<span class="advice-label">PROPOSER ADVICE</span>
+					<p class="advice-text">{advice}</p>
+				</aside>
+			{/if}
 			{#if step.proposal.thinking}
 				<button
 					type="button"
@@ -204,6 +212,32 @@
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
 		color: var(--accent-purple);
+	}
+
+	.advice-panel {
+		margin-bottom: var(--space-md);
+		padding: var(--space-md);
+		background: var(--warning-bg);
+		border: 1px solid var(--warning);
+	}
+
+	.advice-label {
+		display: block;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 500;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--warning);
+		margin-bottom: var(--space-xs);
+	}
+
+	.advice-text {
+		margin: 0;
+		font-size: 14px;
+		line-height: 20px;
+		color: var(--text);
+		white-space: pre-wrap;
 	}
 
 	.thinking-toggle {
