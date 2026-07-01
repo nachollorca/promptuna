@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.32.0 (2026-07-01)
+
+### Features
+
+- **samples**: Add English and Spanish classify_sentiment prompts
+  ([`ef13e98`](https://github.com/nachollorca/promptuna/commit/ef13e98e950e4c73a7fd3ef074c66c8cb7cab14c))
+
+
 ## v1.31.0 (2026-06-30)
 
 ### Documentation
