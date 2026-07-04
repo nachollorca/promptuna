@@ -81,7 +81,7 @@ Apply these principles when writing the candidate:
 Group related instructions (what the input is, labels or constraints, how to behave on output).
 Put the highest-leverage rules where the model attends (the start; for hard-to-follow rules, a brief recap at the end).
 Use markdown (headings, lists, emphasis) for sections and instruction hierarchy.
-You can choose to wrap each placeholder input and major section in XML-like tags (e.g. ``<review>{{ REVIEW }}</review>``, ``<instructions>…</instructions>``) to indicate verbatim or clearly separate user data from directions.
+You can choose to wrap each placeholder input and major section in XML-like tags (e.g. ``<review>{% raw %}{{ REVIEW }}{% endraw %}</review>``, ``<instructions>…</instructions>``) to indicate verbatim or clearly separate user data from directions.
 Use either or both when they improve scanability; avoid decorative nesting or redundant wrappers around every line.
 
 **Clarity.** Use concrete, testable language.
@@ -96,7 +96,7 @@ Do not restate types, enums, or required fields the output schema already enforc
 **Fit the program.** The scaffold and output schema are fixed: truncation, parsing, coercion, and structured-output contracts happen outside the template.
 Work with them — do not duplicate or fight them.
 
-**Placeholders.** Keep every ``{{ ... }}`` variable from prior templates exactly as-is (same names and syntax).
+**Placeholders.** Keep every ``{% raw %}{{ ... }}{% endraw %}`` variable from prior templates exactly as-is (same names and syntax).
 Put user-provided data in dedicated blocks so instructions stay stable across examples.
 The order does not have to stay static: you can swap the order in which the variables are shown as needed.
 
