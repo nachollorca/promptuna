@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.34.0 (2026-07-04)
+
+### Bug Fixes
+
+- **optimizer**: Make placeholders raw in the examples
+  ([`07d3ddf`](https://github.com/nachollorca/promptuna/commit/07d3ddfca052d6d8a58c1df6f404cfd3a499201d))
+
+### Features
+
+- **frontend**: Make rows pulse when in progress, color by mean score
+  ([`fd83ab1`](https://github.com/nachollorca/promptuna/commit/fd83ab185b03f30a4db988cd859f853f8726a168))
+
+- **optimizer**: Emit and display proposer advice in job UI
+  ([`6c0321d`](https://github.com/nachollorca/promptuna/commit/6c0321d4c570ef7d3dd4dcb0bbfc4d53d2b3463d))
+
+
 ## v1.33.0 (2026-07-01)
 
 ### Features
