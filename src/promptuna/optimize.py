@@ -112,6 +112,7 @@ class Step:
     prompt_template: str
     result: RunResults
     thinking: Thinking | None = None
+    advice: str | None = None
 
     @property
     def score(self) -> float:
@@ -125,6 +126,7 @@ class Proposal:
 
     thinking: Thinking | None
     prompt_template: str
+    advice: str | None = None
 
 
 @dataclass
@@ -218,7 +220,11 @@ def default_proposer(
     )
     parsed = response.parsed
     assert parsed is not None, "proposer model returned no structured output"
-    return Proposal(thinking=parsed.thinking, prompt_template=parsed.prompt_template)
+    return Proposal(
+        thinking=parsed.thinking,
+        prompt_template=parsed.prompt_template,
+        advice=parsed.advice,
+    )
 
 
 def _stream_step(
@@ -229,6 +235,7 @@ def _stream_step(
     workers: int,
     prompt_template: str,
     thinking: Thinking | None,
+    advice: str | None = None,
 ) -> Iterator[Trial | Scoring | Step]:
     """Evaluate one checkpoint, yielding trials and scorings then the aggregated step."""
     trials: list[Trial] = []
@@ -248,6 +255,7 @@ def _stream_step(
             scorings=scorings,
         ),
         thinking=thinking,
+        advice=advice,
     )
 
 
@@ -293,7 +301,7 @@ def stream_optimize(
 
     archive: list[Step] = []
 
-    yield Proposal(thinking=None, prompt_template=experiment.prompt_template)
+    yield Proposal(thinking=None, prompt_template=experiment.prompt_template, advice=None)
     for event in _stream_step(
         experiment=experiment,
         examples=examples,
@@ -301,6 +309,7 @@ def stream_optimize(
         workers=workers,
         prompt_template=experiment.prompt_template,
         thinking=None,
+        advice=None,
     ):
         yield event
         if isinstance(event, Step):
@@ -319,6 +328,7 @@ def stream_optimize(
             workers=workers,
             prompt_template=proposal.prompt_template,
             thinking=proposal.thinking,
+            advice=proposal.advice,
         ):
             yield event
             if isinstance(event, Step):

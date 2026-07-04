@@ -44,12 +44,14 @@ export interface ScoringPayload {
 export interface ProposalPayload {
 	prompt_template: string;
 	thinking: Thinking | null;
+	advice?: string | null;
 }
 
 export interface StepPayload {
 	score: number;
 	prompt_template: string;
 	thinking: Thinking | null;
+	advice?: string | null;
 	summary: {
 		overall: { mean: number; sd: number; n: number };
 		per_metric: Record<string, { mean: number; sd: number; n: number }>;
