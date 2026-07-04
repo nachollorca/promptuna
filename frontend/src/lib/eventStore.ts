@@ -101,7 +101,10 @@ function applyTrial(state: EventStoreState, trial: TrialPayload, stepIndex: numb
 	const key = trialStoreKey(state.manifest?.kind, stepIndex, trial.trial_id);
 	const existing = state.trialsById.get(key);
 	if (existing) {
-		existing.trial = trial;
+		// Replace the entry with a new object so consumers (e.g. TrialRow) see a
+		// new trial reference and recompute derived state; mutating in place
+		// would leave the prop reference unchanged and skip reactivity.
+		state.trialsById.set(key, { ...existing, trial });
 	} else {
 		state.trialsById.set(key, { trial, scorings: [] });
 		if (state.manifest?.kind === 'optimize') {
@@ -118,16 +121,17 @@ function applyTrial(state: EventStoreState, trial: TrialPayload, stepIndex: numb
 
 function applyScoring(state: EventStoreState, scoring: ScoringPayload, stepIndex: number): void {
 	const key = trialStoreKey(state.manifest?.kind, stepIndex, scoring.trial_id);
-	const entry = state.trialsById.get(key);
-	if (entry) {
-		const idx = entry.scorings.findIndex(
+	const existing = state.trialsById.get(key);
+	if (existing) {
+		const idx = existing.scorings.findIndex(
 			(s) => s.metric.name === scoring.metric.name && s.replicate === scoring.replicate
 		);
-		if (idx >= 0) {
-			entry.scorings[idx] = scoring;
-		} else {
-			entry.scorings.push(scoring);
-		}
+		// Allocate a new scorings array so TrialRow's `scorings` prop changes
+		// reference and its mean/color derived values recompute live as each
+		// scoring lands (in-place push/assign would not trigger reactivity).
+		const scorings =
+			idx >= 0 ? existing.scorings.with(idx, scoring) : [...existing.scorings, scoring];
+		state.trialsById.set(key, { ...existing, scorings });
 	} else {
 		state.trialsById.set(key, {
 			trial: {
@@ -246,23 +250,23 @@ export function perMetricMeans(
 	return result;
 }
 
-export function worstNormalizedScore(scorings: ScoringPayload[]): number | null {
+export function meanNormalizedScore(scorings: ScoringPayload[]): number | null {
 	const normalized = scorings
 		.filter((s) => s.status === 'success' && s.score)
 		.map((s) => s.score!.normalized);
 	if (normalized.length === 0) return null;
-	return Math.min(...normalized);
+	return normalized.reduce((a, b) => a + b, 0) / normalized.length;
 }
 
 export function trialRowColor(
 	trial: TrialPayload,
 	scorings: ScoringPayload[]
-): 'grey' | 'green' | 'score' {
+): 'grey' | 'running' | 'score' {
 	if (trial.status === 'failed' || scorings.some((s) => s.status === 'failed')) {
 		return 'grey';
 	}
 	if (scorings.length === 0) {
-		return 'green';
+		return 'running';
 	}
 	return 'score';
 }

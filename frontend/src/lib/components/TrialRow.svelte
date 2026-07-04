@@ -5,7 +5,7 @@
 		scoreGradient,
 		snippet,
 		trialRowColor,
-		worstNormalizedScore
+		meanNormalizedScore
 	} from '$lib/eventStore';
 
 	interface Props {
@@ -18,13 +18,13 @@
 	let { trial, scorings, expanded, onToggle }: Props = $props();
 
 	const colorMode = $derived(trialRowColor(trial, scorings));
-	const worstScore = $derived(worstNormalizedScore(scorings));
+	const meanScore = $derived(meanNormalizedScore(scorings));
 
 	const borderStyle = $derived.by(() => {
 		if (colorMode === 'grey') return 'border-color: var(--border); background: var(--surface-dim)';
-		if (colorMode === 'green') return 'border-color: var(--success); background: var(--success-bg)';
-		if (worstScore !== null) {
-			return `border-color: ${scoreGradient(worstScore).replace('88%', '55%')}; background: ${scoreGradient(worstScore).replace('88%', '92%')}`;
+		if (colorMode === 'running') return '';
+		if (meanScore !== null) {
+			return `border-color: ${scoreGradient(meanScore).replace('88%', '55%')}; background: ${scoreGradient(meanScore).replace('88%', '92%')}`;
 		}
 		return '';
 	});
@@ -41,7 +41,12 @@
 	);
 </script>
 
-<article class="trial-row" class:expanded style={borderStyle}>
+<article
+	class="trial-row"
+	class:expanded
+	class:running={colorMode === 'running'}
+	style={borderStyle}
+>
 	<button type="button" class="trial-header" onclick={onToggle} aria-expanded={expanded}>
 		<span class="chevron">{expanded ? '▼' : '▶'}</span>
 		<span class="trial-summary">
@@ -49,21 +54,15 @@
 			<span class="arrow">→</span>
 			<span class="output" class:failed={trial.status === 'failed'}>{outputSummary}</span>
 		</span>
-		{#if scorings.length > 0}
-			<span class="score-chips">
-				{#each scorings as scoring (scoring.metric.name + scoring.replicate)}
-					{#if scoring.status === 'success' && scoring.score}
-						<span class="chip {scoreTier(scoring.score.normalized)}" title={scoring.score.reason}>
-							<span class="chip-metric">{scoring.metric.name}</span>
-							<span class="chip-value">{scoring.score.normalized.toFixed(2)}</span>
-						</span>
-					{:else}
-						<span class="chip failed">
-							<span class="chip-metric">{scoring.metric.name}</span>
-							<span class="chip-value">FAILED</span>
-						</span>
-					{/if}
-				{/each}
+		{#if meanScore !== null}
+			<span class="chip {scoreTier(meanScore)}" title="Mean of metric normalized scores">
+				<span class="chip-metric">MEAN</span>
+				<span class="chip-value">{meanScore.toFixed(2)}</span>
+			</span>
+		{:else if scorings.length > 0}
+			<span class="chip failed" title="All scorings failed for this row">
+				<span class="chip-metric">SCORE</span>
+				<span class="chip-value">FAILED</span>
 			</span>
 		{/if}
 	</button>
@@ -187,6 +186,31 @@
 		flex-wrap: wrap;
 		gap: var(--space-xs);
 		flex-shrink: 0;
+	}
+
+	/* Running state: neutral grey with a subtle border pulse to signal work in progress.
+	   Animations override the inline style, so the keyframes win over the base border. */
+	@keyframes trial-running-pulse {
+		0%,
+		100% {
+			border-color: var(--border);
+			background: var(--surface-dim);
+		}
+		50% {
+			border-color: var(--slate-300);
+			background: var(--slate-200);
+		}
+	}
+
+	.trial-row.running {
+		background: var(--surface-dim);
+		animation: trial-running-pulse 1.8s ease-in-out infinite;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.trial-row.running {
+			animation: none;
+		}
 	}
 
 	.chip {
