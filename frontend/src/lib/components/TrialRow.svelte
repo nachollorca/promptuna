@@ -1,24 +1,28 @@
 <script lang="ts">
 	import type { TrialPayload, ScoringPayload } from '$lib/types';
-	import {
-		formatValue,
-		scoreGradient,
-		snippet,
-		trialRowColor,
-		meanNormalizedScore
-	} from '$lib/eventStore';
+	import { trialRowColor, scoreGradient, meanNormalizedScore } from '$lib/eventStore';
+	import CollapsibleSection from './CollapsibleSection.svelte';
+	import JsonView from './JsonView.svelte';
 
 	interface Props {
 		trial: TrialPayload;
 		scorings: ScoringPayload[];
 		expanded: boolean;
 		onToggle: () => void;
+		index: number;
 	}
 
-	let { trial, scorings, expanded, onToggle }: Props = $props();
+	let { trial, scorings, expanded, onToggle, index }: Props = $props();
 
 	const colorMode = $derived(trialRowColor(trial, scorings));
 	const meanScore = $derived(meanNormalizedScore(scorings));
+
+	// Dataset-provided id wins; fall back to the 1-based row index.
+	const displayId = $derived.by(() => {
+		const inputs = trial.example.inputs as Record<string, unknown>;
+		const id = inputs?.id ?? inputs?.ID ?? inputs?._id;
+		return id !== undefined && id !== null ? String(id) : `#${index}`;
+	});
 
 	const borderStyle = $derived.by(() => {
 		if (colorMode === 'grey') return 'border-color: var(--border); background: var(--surface-dim)';
@@ -35,10 +39,30 @@
 		return 'red';
 	}
 
-	const inputsSummary = $derived(snippet(trial.example.inputs, 60));
-	const outputSummary = $derived(
-		trial.status === 'failed' ? (trial.error?.message ?? 'Failed') : snippet(trial.output, 60)
-	);
+	// Per-metric mean normalized score (averaged across replicates), 2 decimals.
+	const perMetric = $derived.by(() => {
+		const groups: Record<string, number[]> = {};
+		for (const s of scorings) {
+			if (s.status === 'success' && s.score) {
+				(groups[s.metric.name] ??= []).push(s.score.normalized);
+			}
+		}
+		return Object.entries(groups).map(([name, vals]) => ({
+			name,
+			value: vals.reduce((a, b) => a + b, 0) / vals.length
+		}));
+	});
+
+	// Render a value as a JsonView when it's a container, else as plain text in a pre.
+	function isJson(v: unknown): boolean {
+		return typeof v === 'object' && v !== null;
+	}
+
+	function hintFor(v: unknown): string | undefined {
+		if (Array.isArray(v)) return `Array(${v.length})`;
+		if (v && typeof v === 'object') return `{${Object.keys(v).length}}`;
+		return undefined;
+	}
 </script>
 
 <article
@@ -49,16 +73,18 @@
 >
 	<button type="button" class="trial-header" onclick={onToggle} aria-expanded={expanded}>
 		<span class="chevron">{expanded ? '▼' : '▶'}</span>
-		<span class="trial-summary">
-			<span class="inputs">{inputsSummary}</span>
-			<span class="arrow">→</span>
-			<span class="output" class:failed={trial.status === 'failed'}>{outputSummary}</span>
-		</span>
+		<span class="trial-id">{displayId}</span>
 		{#if meanScore !== null}
 			<span class="chip {scoreTier(meanScore)}" title="Mean of metric normalized scores">
 				<span class="chip-metric">MEAN</span>
 				<span class="chip-value">{meanScore.toFixed(2)}</span>
 			</span>
+			{#each perMetric as m (m.name)}
+				<span class="chip {scoreTier(m.value)}" title={`${m.name} normalized score`}>
+					<span class="chip-metric">{m.name}</span>
+					<span class="chip-value">{m.value.toFixed(2)}</span>
+				</span>
+			{/each}
 		{:else if scorings.length > 0}
 			<span class="chip failed" title="All scorings failed for this row">
 				<span class="chip-metric">SCORE</span>
@@ -69,25 +95,41 @@
 
 	{#if expanded}
 		<div class="trial-detail">
-			<section>
-				<h4>Inputs</h4>
-				<pre class="mono">{formatValue(trial.example.inputs)}</pre>
-			</section>
-			<section>
-				<h4>Reference</h4>
-				<pre class="mono">{formatValue(trial.example.reference)}</pre>
-			</section>
+			<CollapsibleSection label="Inputs" hint={hintFor(trial.example.inputs)}>
+				{#if isJson(trial.example.inputs)}
+					<div class="json-box"><JsonView value={trial.example.inputs} /></div>
+				{:else}
+					<pre class="mono">{trial.example.inputs ?? '—'}</pre>
+				{/if}
+			</CollapsibleSection>
+
+			<CollapsibleSection label="Reference" hint={hintFor(trial.example.reference)}>
+				{#if isJson(trial.example.reference)}
+					<div class="json-box"><JsonView value={trial.example.reference} /></div>
+				{:else}
+					<pre class="mono">{trial.example.reference ?? '—'}</pre>
+				{/if}
+			</CollapsibleSection>
+
 			{#if trial.status === 'success'}
-				<section>
-					<h4>Output</h4>
-					<pre class="mono">{formatValue(trial.output)}</pre>
-				</section>
+				<CollapsibleSection label="Output" hint={hintFor(trial.output)}>
+					{#if isJson(trial.output)}
+						<div class="json-box"><JsonView value={trial.output} /></div>
+					{:else}
+						<pre class="mono">{trial.output ?? '—'}</pre>
+					{/if}
+				</CollapsibleSection>
+
 				{#if trial.telemetry}
-					<section>
+					<section class="telemetry-section">
 						<h4>Telemetry</h4>
 						{#if trial.telemetry.rendered_prompt}
-							<p class="muted">Rendered prompt</p>
-							<pre class="mono">{trial.telemetry.rendered_prompt}</pre>
+							<CollapsibleSection
+								label="Rendered prompt"
+								hint={`${trial.telemetry.rendered_prompt.length} chars`}
+							>
+								<pre class="mono">{trial.telemetry.rendered_prompt}</pre>
+							</CollapsibleSection>
 						{/if}
 						{#if trial.telemetry.response}
 							<ul class="telemetry-stats">
@@ -105,12 +147,16 @@
 				</section>
 			{/if}
 			{#each scorings as scoring (scoring.metric.name + scoring.replicate)}
-				<section>
+				<section class="scoring-section">
 					<h4>Scoring — {scoring.metric.name}</h4>
 					{#if scoring.status === 'success' && scoring.score}
-						<p>Normalized: <strong>{scoring.score.normalized.toFixed(3)}</strong></p>
-						<p class="muted">Reason</p>
-						<pre class="mono">{scoring.score.reason}</pre>
+						<p class="scoring-stat">
+							<span class="scoring-key">NORMALIZED</span>
+							<strong>{scoring.score.normalized.toFixed(3)}</strong>
+						</p>
+						<CollapsibleSection label="Reason">
+							<pre class="mono">{scoring.score.reason}</pre>
+						</CollapsibleSection>
 					{:else if scoring.error}
 						<p class="error-text">{scoring.error.type}: {scoring.error.message}</p>
 					{/if}
@@ -154,38 +200,16 @@
 		flex-shrink: 0;
 	}
 
-	.trial-summary {
+	.trial-id {
 		flex: 1;
-		display: flex;
-		align-items: center;
-		gap: var(--space-sm);
 		min-width: 0;
 		font-family: var(--font-mono);
 		font-size: 13px;
-		line-height: 20px;
-	}
-
-	.inputs,
-	.output {
+		font-weight: 500;
+		color: var(--text);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-
-	.arrow {
-		color: var(--muted);
-		flex-shrink: 0;
-	}
-
-	.output.failed {
-		color: var(--danger);
-	}
-
-	.score-chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-xs);
-		flex-shrink: 0;
 	}
 
 	/* Running state: neutral grey with a subtle border pulse to signal work in progress.
@@ -260,33 +284,50 @@
 		border-top: 1px solid var(--border);
 	}
 
-	.trial-detail section {
+	/* Section headers use a consistent small uppercase mono label so children
+	   (e.g. "Rendered prompt") never read larger than their parent. */
+	.trial-detail :global(h4) {
+		margin: var(--space-md) 0 var(--space-sm);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text);
+	}
+
+	.trial-detail :global(.telemetry-section),
+	.trial-detail :global(.scoring-section) {
 		margin-top: var(--space-md);
 	}
 
-	.trial-detail h4 {
-		margin: 0 0 var(--space-sm);
+	.json-box {
+		padding: var(--space-sm) var(--space-md);
+		background: var(--surface-secondary);
+		border: 1px solid var(--border);
 		font-family: var(--font-mono);
-		font-size: 11px;
-		font-weight: 500;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: var(--muted);
+		font-size: 12px;
+		line-height: 18px;
+		overflow-x: auto;
 	}
 
-	.trial-detail pre.mono {
+	.trial-detail :global(pre.mono) {
 		margin: 0;
 		padding: var(--space-md);
 		background: var(--surface-secondary);
 		border: 1px solid var(--border);
+		font-size: 12px;
+		line-height: 18px;
+		white-space: pre-wrap;
+		overflow-x: auto;
 	}
 
 	.telemetry-stats {
-		margin: var(--space-xs) 0 0;
-		padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-lg);
+		margin: var(--space-sm) 0 0;
+		padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-lg);
 		font-family: var(--font-mono);
-		font-size: 13px;
-		line-height: 22px;
+		font-size: 12px;
+		line-height: 20px;
 		border: 1px solid var(--border);
 		background: var(--surface-secondary);
 		list-style: square;
@@ -297,5 +338,28 @@
 		margin: 0;
 		font-family: var(--font-mono);
 		font-size: 13px;
+	}
+
+	.scoring-stat {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-sm);
+		margin: 0 0 var(--space-xs);
+	}
+
+	.scoring-key {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 500;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	.scoring-stat strong {
+		font-family: var(--font-mono);
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--text);
 	}
 </style>
