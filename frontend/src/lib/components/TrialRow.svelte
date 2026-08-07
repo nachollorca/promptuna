@@ -1,12 +1,8 @@
 <script lang="ts">
 	import type { TrialPayload, ScoringPayload } from '$lib/types';
-	import {
-		formatValue,
-		scoreGradient,
-		snippet,
-		trialRowColor,
-		meanNormalizedScore
-	} from '$lib/eventStore';
+	import { snippet, trialRowColor, scoreGradient, meanNormalizedScore } from '$lib/eventStore';
+	import CollapsibleSection from './CollapsibleSection.svelte';
+	import JsonView from './JsonView.svelte';
 
 	interface Props {
 		trial: TrialPayload;
@@ -39,6 +35,17 @@
 	const outputSummary = $derived(
 		trial.status === 'failed' ? (trial.error?.message ?? 'Failed') : snippet(trial.output, 60)
 	);
+
+	// Render a value as a JsonView when it's a container, else as plain text in a pre.
+	function isJson(v: unknown): boolean {
+		return typeof v === 'object' && v !== null;
+	}
+
+	function hintFor(v: unknown): string | undefined {
+		if (Array.isArray(v)) return `Array(${v.length})`;
+		if (v && typeof v === 'object') return `{${Object.keys(v).length}}`;
+		return undefined;
+	}
 </script>
 
 <article
@@ -69,25 +76,41 @@
 
 	{#if expanded}
 		<div class="trial-detail">
-			<section>
-				<h4>Inputs</h4>
-				<pre class="mono">{formatValue(trial.example.inputs)}</pre>
-			</section>
-			<section>
-				<h4>Reference</h4>
-				<pre class="mono">{formatValue(trial.example.reference)}</pre>
-			</section>
+			<CollapsibleSection label="Inputs" hint={hintFor(trial.example.inputs)}>
+				{#if isJson(trial.example.inputs)}
+					<div class="json-box"><JsonView value={trial.example.inputs} /></div>
+				{:else}
+					<pre class="mono">{trial.example.inputs ?? '—'}</pre>
+				{/if}
+			</CollapsibleSection>
+
+			<CollapsibleSection label="Reference" hint={hintFor(trial.example.reference)}>
+				{#if isJson(trial.example.reference)}
+					<div class="json-box"><JsonView value={trial.example.reference} /></div>
+				{:else}
+					<pre class="mono">{trial.example.reference ?? '—'}</pre>
+				{/if}
+			</CollapsibleSection>
+
 			{#if trial.status === 'success'}
-				<section>
-					<h4>Output</h4>
-					<pre class="mono">{formatValue(trial.output)}</pre>
-				</section>
+				<CollapsibleSection label="Output" hint={hintFor(trial.output)}>
+					{#if isJson(trial.output)}
+						<div class="json-box"><JsonView value={trial.output} /></div>
+					{:else}
+						<pre class="mono">{trial.output ?? '—'}</pre>
+					{/if}
+				</CollapsibleSection>
+
 				{#if trial.telemetry}
-					<section>
+					<section class="telemetry-section">
 						<h4>Telemetry</h4>
 						{#if trial.telemetry.rendered_prompt}
-							<p class="muted">Rendered prompt</p>
-							<pre class="mono">{trial.telemetry.rendered_prompt}</pre>
+							<CollapsibleSection
+								label="Rendered prompt"
+								hint={`${trial.telemetry.rendered_prompt.length} chars`}
+							>
+								<pre class="mono">{trial.telemetry.rendered_prompt}</pre>
+							</CollapsibleSection>
 						{/if}
 						{#if trial.telemetry.response}
 							<ul class="telemetry-stats">
@@ -105,12 +128,13 @@
 				</section>
 			{/if}
 			{#each scorings as scoring (scoring.metric.name + scoring.replicate)}
-				<section>
+				<section class="scoring-section">
 					<h4>Scoring — {scoring.metric.name}</h4>
 					{#if scoring.status === 'success' && scoring.score}
 						<p>Normalized: <strong>{scoring.score.normalized.toFixed(3)}</strong></p>
-						<p class="muted">Reason</p>
-						<pre class="mono">{scoring.score.reason}</pre>
+						<CollapsibleSection label="Reason">
+							<pre class="mono">{scoring.score.reason}</pre>
+						</CollapsibleSection>
 					{:else if scoring.error}
 						<p class="error-text">{scoring.error.type}: {scoring.error.message}</p>
 					{/if}
@@ -179,13 +203,6 @@
 
 	.output.failed {
 		color: var(--danger);
-	}
-
-	.score-chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-xs);
-		flex-shrink: 0;
 	}
 
 	/* Running state: neutral grey with a subtle border pulse to signal work in progress.
@@ -260,33 +277,50 @@
 		border-top: 1px solid var(--border);
 	}
 
-	.trial-detail section {
+	/* Section headers use a consistent small uppercase mono label so children
+	   (e.g. "Rendered prompt") never read larger than their parent. */
+	.trial-detail :global(h4) {
+		margin: var(--space-md) 0 var(--space-sm);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text);
+	}
+
+	.trial-detail :global(.telemetry-section),
+	.trial-detail :global(.scoring-section) {
 		margin-top: var(--space-md);
 	}
 
-	.trial-detail h4 {
-		margin: 0 0 var(--space-sm);
+	.json-box {
+		padding: var(--space-sm) var(--space-md);
+		background: var(--surface-secondary);
+		border: 1px solid var(--border);
 		font-family: var(--font-mono);
-		font-size: 11px;
-		font-weight: 500;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: var(--muted);
+		font-size: 12px;
+		line-height: 18px;
+		overflow-x: auto;
 	}
 
-	.trial-detail pre.mono {
+	.trial-detail :global(pre.mono) {
 		margin: 0;
 		padding: var(--space-md);
 		background: var(--surface-secondary);
 		border: 1px solid var(--border);
+		font-size: 12px;
+		line-height: 18px;
+		white-space: pre-wrap;
+		overflow-x: auto;
 	}
 
 	.telemetry-stats {
-		margin: var(--space-xs) 0 0;
-		padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-lg);
+		margin: var(--space-sm) 0 0;
+		padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-lg);
 		font-family: var(--font-mono);
-		font-size: 13px;
-		line-height: 22px;
+		font-size: 12px;
+		line-height: 20px;
 		border: 1px solid var(--border);
 		background: var(--surface-secondary);
 		list-style: square;
