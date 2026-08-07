@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.35.0 (2026-08-07)
+
+### Features
+
+- **frontend**: Collapse large trial fields, per-metric chips, row ids
+  ([`9d20d5f`](https://github.com/nachollorca/promptuna/commit/9d20d5f94794b70f5ab2589f1390e58c5674655c))
+
+- **frontend**: Make expanders for large fields
+  ([`7fe163d`](https://github.com/nachollorca/promptuna/commit/7fe163d136f314ba2076ccc75159a1428c8e33b6))
+
+
 ## v1.34.0 (2026-07-04)
 
 ### Bug Fixes
