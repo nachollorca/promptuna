@@ -67,7 +67,7 @@
 	<section class="panel">
 		<h2>Results</h2>
 		<AggregateBar {store} {complete} />
-		{#each store.flatTrialIds as trialId (trialId)}
+		{#each store.flatTrialIds as trialId, i (trialId)}
 			{@const entry = store.trialsById.get(trialId)}
 			{#if entry}
 				<TrialRow
@@ -75,6 +75,7 @@
 					scorings={entry.scorings}
 					expanded={expandedTrials.has(trialId)}
 					onToggle={() => toggleTrial(trialId)}
+					index={i + 1}
 				/>
 			{/if}
 		{/each}

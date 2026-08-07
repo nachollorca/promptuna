@@ -79,7 +79,7 @@
 	{/if}
 
 	<div class="trials">
-		{#each step.trialIds as trialKey (trialKey)}
+		{#each step.trialIds as trialKey, i (trialKey)}
 			{@const entry = store.trialsById.get(trialKey)}
 			{#if entry}
 				<TrialRow
@@ -87,6 +87,7 @@
 					scorings={entry.scorings}
 					expanded={expandedTrials.has(trialKey)}
 					onToggle={() => onToggleTrial(trialKey)}
+					index={i + 1}
 				/>
 			{/if}
 		{/each}
