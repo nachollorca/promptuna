@@ -160,30 +160,36 @@ PyPI users install only what they need (`promptuna`, `promptuna-cli`, and/or `pr
 
 ## Vibe Coding in Promptuna
 
-### The core library and server
 The bulk of this project has been developed on and off between May and July 2026.
 As a side project, it would have never happened if it wasn't for LLMs easing a lot of the workload.
-I have made what I deem to be a reasonable use of AI as per their capability today, which is surely very different if you are reading this just 6 months after I wrote it.
+I have made what I deem to be a reasonable use of AI as per their capability today,
+which is surely very different if you are reading this just 6 months after I wrote it.
 That is:
 
 I need to write manually most of the data structures to order my mind about what do I want.
 Same with the signatures (not the actual body) of the main functions.
 And even these things, I discuss with AI again and again until they feel just right.
-I basically have by my side a colleague that never gets tired of my bs :).
-It is just often necessary to prompt it to challenge me and not agree with my first idea.
+I basically have by my side a colleague that is always up for discussions and never gets tired of my bs :)
+It is just often necessary to prompt it to challenge me and not agree with my very first idea.
 
 Once the contours and skeleton are clear, I have AI agents put the color and meat into the code.
 I always review the outputted code, but only diagonally:
 I do not go nitpicking the specifics artifacts used.
-If I identify any pattern I dislike and gets repeated often, I make sure to include it in some "persistent" memory, typically in a MD file like AGENTS or DESIGN.
+If I identify any pattern I dislike and gets repeated often,
+I make sure to include it in some "persistent" memory, typically in a MD file like AGENTS or DESIGN.
 
-I do not know frontend, nor do I care much about it. Not JS, nor any of its frameworks.
-Here I really vibe coded the shit out of it without reading a single line of code :)
+I do not know frontend, nor do I care much about it: I just needed a decent enough GUI to display results (terminal only was not enough).
+Here I really vibe coded the shit out of it without reading a single line :)
+I used [Stitch](https://stitch.withgoogle.com/) to produce a [DESIGN.md](frontend/DESIGN.md),
+then I explained what I wanted to [GLM 5.2](https://huggingface.co/zai-org/GLM-5.2), which was the SOTA LLM for frontend tasks at the moment.
 
-I started using [Pi](pi.dev), mostly with Opus 4.8.
-Then, [Artificial Analysis](artificialanalysis.ai) published their [agent benchmark](), where they combine models and harnesses.
-I discovered [Cursor's Composer 2.5](), a fine-tune from [Moonshot's Kimi]() that had an absurd bang for your buck.
-This model was only available in Cursor, so my love affair with it started.
+I started using [Pi](https://pi.dev), mostly with Opus 4.8.
+Then, [Artificial Analysis](https://artificialanalysis.ai) published their [agent benchmark](https://artificialanalysis.ai/agents/coding-agents),
+where they combine models and harnesses.
+On that note, [here](https://github.com/JoelNiklaus/harness-optimization#how-much-is-the-harness-worth-swe-bench-pro)
+is a very interesting study about how large the effect of the harness is on the outputs of an LM.
+In AA, I discovered [Cursor's Composer 2.5](https://cursor.com/blog/composer-2-5), a fine-tune from Moonshot's Kimi that had an absurd bang for your buck.
+This model was only available in Cursor, and so did our love affair started.
 Most of the code has done with it.
 The summer has seen a myriad of impressive releases. In the "impressively cheap" department, GPT 5.6 Luna and Deepseek Flash v4.
 So I am back at using Pi with my OpenRouter key to go back and forth between them.
