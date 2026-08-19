@@ -10,12 +10,16 @@
 		expanded: boolean;
 		onToggle: () => void;
 		index: number;
+		/** Metrics the job scores; a row pulses until all of them have reported. */
+		metrics?: string[];
 	}
 
-	let { trial, scorings, expanded, onToggle, index }: Props = $props();
+	let { trial, scorings, expanded, onToggle, index, metrics = [] }: Props = $props();
 
-	const colorMode = $derived(trialRowColor(trial, scorings));
-	const meanScore = $derived(meanNormalizedScore(scorings));
+	const colorMode = $derived(trialRowColor(trial, scorings, metrics));
+	// Withhold the mean until scoring is complete, else a partially-scored row
+	// shows a chip (and colour) computed from the metrics that happened to finish first.
+	const meanScore = $derived(colorMode === 'running' ? null : meanNormalizedScore(scorings));
 
 	// Dataset-provided id wins; fall back to the 1-based row index.
 	const displayId = $derived.by(() => {
@@ -85,7 +89,7 @@
 					<span class="chip-value">{m.value.toFixed(2)}</span>
 				</span>
 			{/each}
-		{:else if scorings.length > 0}
+		{:else if colorMode !== 'running' && scorings.length > 0}
 			<span class="chip failed" title="All scorings failed for this row">
 				<span class="chip-metric">SCORE</span>
 				<span class="chip-value">FAILED</span>

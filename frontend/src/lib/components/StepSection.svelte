@@ -88,6 +88,7 @@
 					expanded={expandedTrials.has(trialKey)}
 					onToggle={() => onToggleTrial(trialKey)}
 					index={i + 1}
+					metrics={store.manifest?.metrics ?? []}
 				/>
 			{/if}
 		{/each}

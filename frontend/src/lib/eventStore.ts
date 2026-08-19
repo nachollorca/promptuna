@@ -258,17 +258,20 @@ export function meanNormalizedScore(scorings: ScoringPayload[]): number | null {
 	return normalized.reduce((a, b) => a + b, 0) / normalized.length;
 }
 
+/**
+ * A row only leaves the pulsing state once every expected metric has reported;
+ * colouring on the first arriving scoring paints a misleading (often red) mean
+ * while the other metrics are still running.
+ */
 export function trialRowColor(
 	trial: TrialPayload,
-	scorings: ScoringPayload[]
+	scorings: ScoringPayload[],
+	metrics: string[] = []
 ): 'grey' | 'running' | 'score' {
-	if (trial.status === 'failed' || scorings.some((s) => s.status === 'failed')) {
-		return 'grey';
-	}
-	if (scorings.length === 0) {
-		return 'running';
-	}
-	return 'score';
+	if (trial.status === 'failed') return 'grey';
+	const expected = metrics.length; // empty for `run` jobs: nothing to wait for
+	if (new Set(scorings.map((s) => s.metric.name)).size < expected) return 'running';
+	return meanNormalizedScore(scorings) === null ? 'grey' : 'score';
 }
 
 export function scoreGradient(normalized: number): string {
