@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.35.1 (2026-08-19)
+
+### Bug Fixes
+
+- **frontend**: Keep trial rows pulsing until all metrics score
+  ([`67f6ef1`](https://github.com/nachollorca/promptuna/commit/67f6ef1793070c91ab73bb25e613c18ddf4a897f))
+
+### Documentation
+
+- Write about the use of AI in the package
+  ([`cfce645`](https://github.com/nachollorca/promptuna/commit/cfce6450c823502bc27aece974264285508a6f3d))
+
+- **readme**: Edit the written with AI part
+  ([`7079dac`](https://github.com/nachollorca/promptuna/commit/7079dac0d4f043c5d3d6375405973ca598d48c36))
+
+
 ## v1.35.0 (2026-08-07)
 
 ### Features
