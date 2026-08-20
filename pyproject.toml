@@ -3,7 +3,7 @@
 name = "promptuna"
 version = "1.35.1"
 description = "Language Model Evaluation Harness"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 readme = "README.md"
 authors = [{ name = "Ignacio Llorca", email = "nllorca@proton.me" }]
