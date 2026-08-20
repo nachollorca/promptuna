@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.35.3 (2026-08-20)
+
+### Bug Fixes
+
+- Lower supported python floor to 3.12 for cli and server
+  ([#70](https://github.com/nachollorca/promptuna/pull/70),
+  [`4322b89`](https://github.com/nachollorca/promptuna/commit/4322b894e7cce9b98c7e9ab1675ab9c6bc6d44d0))
+
+### Continuous Integration
+
+- Require python 3.12 in server and cli ([#69](https://github.com/nachollorca/promptuna/pull/69),
+  [`ed5c801`](https://github.com/nachollorca/promptuna/commit/ed5c8015f29dbc53265012895f0bef6b49aded64))
+
+
 ## v1.35.2 (2026-08-20)
 
 ### Bug Fixes
