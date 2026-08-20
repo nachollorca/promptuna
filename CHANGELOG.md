@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.35.2 (2026-08-20)
+
+### Bug Fixes
+
+- Trigger release
+  ([`370e563`](https://github.com/nachollorca/promptuna/commit/370e563e9728be0a361fa00fbc2313603441d0b6))
+
+### Continuous Integration
+
+- Allow promptuna 3.12
+  ([`755aa92`](https://github.com/nachollorca/promptuna/commit/755aa9220d472a06daf5ea2cca90a698513408ad))
+
+
 ## v1.35.1 (2026-08-19)
 
 ### Bug Fixes
