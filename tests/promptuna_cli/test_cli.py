@@ -188,6 +188,53 @@ def test_report_reads_finished_job(fake_complete):
     assert json.loads(report_result.stdout)["job_id"] == job_id
 
 
+def test_export_writes_every_eval_pair(fake_complete, tmp_path: Path):
+    run_result = RUNNER.invoke(
+        app,
+        [
+            "evaluate",
+            "--project",
+            "test_project",
+            "--program",
+            "echo",
+            "--prompt",
+            "baseline",
+            "--examples",
+            "dev",
+            "--model",
+            "test:model",
+            "--metric",
+            "exact_match",
+        ],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+    job_id = run_result.stderr.strip().split()[-1]
+
+    export_result = RUNNER.invoke(
+        app,
+        [
+            "export",
+            job_id,
+            "--out",
+            str(tmp_path),
+            "--uuid",
+            "123e4567-e89b-42d3-a456-426614174000",
+        ],
+    )
+
+    assert export_result.exit_code == 0, export_result.output
+    aggregate = json.loads(Path(export_result.stdout.strip()).read_text())
+    assert aggregate["evaluation_id"].startswith("test_project_echo/")
+    assert aggregate["evaluation_results"][0]["metric_config"]["metric_name"] == "exact_match"
+    assert aggregate["detailed_evaluation_results"]["total_rows"] == 2
+
+
+def test_export_missing_job_exits_with_code_2(tmp_path: Path):
+    result = RUNNER.invoke(app, ["export", "nope", "--out", str(tmp_path)])
+
+    assert result.exit_code == 2
+
+
 def test_invalid_project_exits_with_code_2():
     result = RUNNER.invoke(
         app,

@@ -37,3 +37,7 @@ LM calls are stochastic. `--repeats n` runs every example *n* times (one `Trial`
 - **on disk** — `<projects_root>/jobs/<job_id>/` (`summary.json`, manifest, streamed events)
 
 `report <job_id>` always prints `summary.json` to stdout.
+
+## Every Eval Ever export
+
+`export <job_id> --out <dir>` converts a finished job into the [Every Eval Ever](https://github.com/evaleval/every_eval_ever) schema: `<uuid>.json` plus its `<uuid>_samples.jsonl` companion, written under `data/<collection>/<developer>/<model>/`. Pass `--uuid` to make re-exports land on the same datastore path; `--deployment-type` and `--model-availability` state what the job itself cannot know.

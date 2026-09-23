@@ -99,6 +99,7 @@ def test_serialize_successful_scoring(experiment, example, exact_match_metric):
     assert payload["metric"] == {
         "name": "exact_match",
         "description": "Output must match the reference answer.",
+        "scale": {"kind": "range", "floor": 0.0, "ceiling": 1.0},
         "kind": "programmatic",
     }
     assert payload["score"] == {
