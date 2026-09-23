@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v1.38.0 (2026-09-23)
+
+### Bug Fixes
+
+- **frontend**: Pick up serialized scales
+  ([`f23b5e7`](https://github.com/nachollorca/promptuna/commit/f23b5e79f16878b0f858387919c1169766fe6f5d))
+
+- **serialize**: Make sure scales are serializable too
+  ([`92f886b`](https://github.com/nachollorca/promptuna/commit/92f886b276cb25ebbaca7dd16046cdaa042d827b))
+
+### Documentation
+
+- Pdate README to include lmdk usage
+  ([`996230d`](https://github.com/nachollorca/promptuna/commit/996230d786dd1398a16413bdde33dd929818e3f1))
+
+- **eee**: Explain export to every eval ever format
+  ([`f9f6b1e`](https://github.com/nachollorca/promptuna/commit/f9f6b1e2262750f6c25c1133236277430c2d0f80))
+
+### Features
+
+- **cli**: Export to EEE format
+  ([`d78b909`](https://github.com/nachollorca/promptuna/commit/d78b90902019c8a6682c813021969cfedc0b8f54))
+
+- **export**: To every eval ever format
+  ([`c7f9baa`](https://github.com/nachollorca/promptuna/commit/c7f9baa370c0a7cd0d60db2a546863198cfed2ea))
+
+
 ## v1.37.2 (2026-08-31)
 
 ### Bug Fixes
