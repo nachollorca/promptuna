@@ -1577,7 +1577,7 @@ wheels = [
 
 [[package]]
 name = "promptuna"
-version = "1.37.0"
+version = "1.37.2"
 source = { editable = "." }
 dependencies = [
     { name = "lmdk" },
@@ -1624,7 +1624,7 @@ dev = [
 
 [[package]]
 name = "promptuna-cli"
-version = "1.37.0"
+version = "1.37.2"
 source = { editable = "cli" }
 dependencies = [
     { name = "promptuna" },
@@ -1639,7 +1639,7 @@ requires-dist = [
 
 [[package]]
 name = "promptuna-server"
-version = "1.37.0"
+version = "1.37.2"
 source = { editable = "server" }
 dependencies = [
     { name = "fastapi" },
