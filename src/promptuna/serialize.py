@@ -18,7 +18,9 @@ from promptuna.evaluate import (
     FailedScoring,
     LLMJudgeMetric,
     Metric,
+    Ordinal,
     ProgrammaticMetric,
+    Range,
     Scoring,
     SuccessfulScoring,
 )
@@ -192,8 +194,21 @@ def _serialize_trial(trial: Trial) -> dict[str, Any]:
     return payload
 
 
-def _serialize_metric(metric: Metric) -> dict[str, str]:
-    payload = {"name": metric.name, "description": metric.description}
+def _serialize_scale(scale: Any) -> dict[str, Any] | None:
+    """Describe the metric's scale so raw scores stay interpretable off-disk."""
+    if isinstance(scale, Range):
+        return {"kind": "range", "floor": scale.floor, "ceiling": scale.ceiling}
+    if isinstance(scale, Ordinal):
+        return {"kind": "ordinal", "levels": _serialize_value(scale.levels)}
+    return None
+
+
+def _serialize_metric(metric: Metric) -> dict[str, Any]:
+    payload = {
+        "name": metric.name,
+        "description": metric.description,
+        "scale": _serialize_scale(metric.scale),
+    }
     if isinstance(metric, ProgrammaticMetric):
         payload["kind"] = "programmatic"
     elif isinstance(metric, LLMJudgeMetric):
