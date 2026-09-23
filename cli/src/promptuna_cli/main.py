@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from promptuna.evaluate import stream_evaluate
+from promptuna.every_eval import export_every_eval
 from promptuna.jobs import get_jobs_root, load_job
 from promptuna.optimize import stream_optimize
 from promptuna.projects import (
@@ -280,6 +281,53 @@ def report(
         raise typer.Exit(code=1)
 
     typer.echo(json.dumps(record.summary, indent=2, sort_keys=True))
+
+
+@app.command()
+def export(
+    job_id: Annotated[str, typer.Argument(help="Job id under <projects_root>/jobs/.")],
+    out: Annotated[
+        Path,
+        typer.Option(
+            "--out",
+            help="Directory to write the EEE datastore layout under.",
+            file_okay=False,
+            resolve_path=True,
+        ),
+    ],
+    collection: Annotated[
+        str | None, typer.Option(help="EEE collection name (defaults to the project name).")
+    ] = None,
+    organization: Annotated[
+        str, typer.Option(help="Organization publishing the record.")
+    ] = "promptuna",
+    deployment_type: Annotated[
+        str, typer.Option(help="self_deployed | externally_managed | unknown")
+    ] = "unknown",
+    model_availability: Annotated[
+        str, typer.Option(help="open_weights | closed_weights | unknown")
+    ] = "unknown",
+    log_uuid: Annotated[
+        str | None,
+        typer.Option("--uuid", help="UUID4 for the file pair (defaults to a fresh one)."),
+    ] = None,
+) -> None:
+    """Export a finished job in the Every Eval Ever schema."""
+    job_dir = get_jobs_root() / job_id
+    if not job_dir.is_dir():
+        typer.echo(f"job {job_id!r} not found", err=True)
+        raise typer.Exit(code=2)
+
+    aggregate_path = export_every_eval(
+        job_dir,
+        out,
+        collection=collection,
+        organization=organization,
+        deployment_type=deployment_type,
+        model_availability=model_availability,
+        log_uuid=log_uuid,
+    )
+    typer.echo(str(aggregate_path))
 
 
 def run_cli() -> None:
