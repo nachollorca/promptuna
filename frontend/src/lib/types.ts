@@ -37,7 +37,15 @@ export interface TrialPayload {
 export interface ScoringPayload {
 	trial_id: string;
 	example_id?: string;
-	metric: { name: string; description: string; kind: 'programmatic' | 'llm_judge' };
+	metric: {
+		name: string;
+		description: string;
+		kind: 'programmatic' | 'llm_judge';
+		scale?:
+			| { kind: 'range'; floor: number; ceiling: number }
+			| { kind: 'ordinal'; levels: unknown[] }
+			| null;
+	};
 	replicate: number;
 	status: TrialStatus;
 	score?: { raw: unknown; normalized: number; reason: string };
