@@ -10,11 +10,14 @@ Each project is a subdirectory of the **projects root**:
 <project_name>/
 ├── programs.py       # program functions (--program = function name)
 ├── metrics.py        # ProgrammaticMetric / LLMJudgeMetric (--metric = variable name)
-├── prompts/
-│   └── <name>.jinja  # Jinja2 templates (--prompt = stem)
+├── prompt.jinja      # single prompt (default --prompt name: "prompt")
+├── prompts/          # or multi-prompt templates (--prompt = stem)
+│   └── <name>.jinja
 └── data/
     └── <name>.jsonl  # datasets (--examples = stem; rows: inputs + optional reference)
 ```
+
+Use either a root `prompt.jinja` or a `prompts/` directory; `prompts/` wins when it contains templates.
 
 ## Projects root
 

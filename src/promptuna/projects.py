@@ -18,6 +18,7 @@ from promptuna.program import Example, Experiment, Program
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _RESERVED_WORKSPACE_DIRS = frozenset({"jobs"})
+DEFAULT_PROMPT_NAME = "prompt"
 _projects_root: Path | None = None
 
 
@@ -169,11 +170,29 @@ def resolve_metrics(project_dir: Path, names: list[str]) -> list[Metric]:
     return metrics
 
 
-def resolve_prompt_template(project_dir: Path, prompt: str) -> str:
-    """Read ``prompts/<prompt>.jinja`` from the project."""
+def _prompt_template_paths(project_dir: Path) -> dict[str, Path]:
+    """Map prompt names to template paths.
+
+    ``prompts/*.jinja`` wins when present; otherwise a single project-root
+    ``prompt.jinja`` is offered under :data:`DEFAULT_PROMPT_NAME`.
+    """
+    prompts_dir = project_dir / "prompts"
+    if prompts_dir.is_dir():
+        templates = {
+            path.stem: path for path in prompts_dir.glob("*.jinja") if _NAME_RE.match(path.stem)
+        }
+        if templates:
+            return templates
+
+    single = project_dir / f"{DEFAULT_PROMPT_NAME}.jinja"
+    return {DEFAULT_PROMPT_NAME: single} if single.is_file() else {}
+
+
+def resolve_prompt_template(project_dir: Path, prompt: str = DEFAULT_PROMPT_NAME) -> str:
+    """Read ``prompts/<prompt>.jinja`` or the project-root ``prompt.jinja``."""
     _validate_name(prompt, kind="prompt")
-    path = _resolve_under_root(project_dir, "prompts", f"{prompt}.jinja")
-    if not path.is_file():
+    path = _prompt_template_paths(project_dir).get(prompt)
+    if path is None:
         raise ProjectValidationError(f"prompt {prompt!r} not found")
     return path.read_text(encoding="utf-8")
 
@@ -239,11 +258,8 @@ def list_metric_names(project_dir: Path) -> list[str]:
 
 
 def list_prompt_names(project_dir: Path) -> list[str]:
-    """Return prompt template names from ``prompts/*.jinja``."""
-    prompts_dir = project_dir / "prompts"
-    if not prompts_dir.is_dir():
-        return []
-    return sorted(path.stem for path in prompts_dir.glob("*.jinja") if _NAME_RE.match(path.stem))
+    """Return prompt names from ``prompts/*.jinja`` or the root ``prompt.jinja``."""
+    return sorted(_prompt_template_paths(project_dir))
 
 
 def list_dataset_names(project_dir: Path) -> list[str]:
@@ -274,7 +290,7 @@ def build_experiment(
     *,
     project: str,
     program: str,
-    prompt: str,
+    prompt: str = DEFAULT_PROMPT_NAME,
     model: str,
     examples: str,
     metrics: list[str] | None = None,
