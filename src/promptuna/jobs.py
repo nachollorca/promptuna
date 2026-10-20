@@ -385,6 +385,23 @@ def _telemetry_rollup(successful_trials: list[dict[str, Any]]) -> dict[str, Any]
     }
 
 
+def _step_summary(event: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "step_index": event["step_index"],
+        "score": event["payload"]["score"],
+        "prompt_template": event["payload"]["prompt_template"],
+        "summary": event["payload"]["summary"],
+    }
+
+
+def _steps_rollup(steps: list[dict[str, Any]]) -> dict[str, Any]:
+    summaries = [_step_summary(event) for event in steps]
+    rollup: dict[str, Any] = {"steps": summaries}
+    if summaries:
+        rollup["best_step"] = max(summaries, key=lambda item: item["score"])
+    return rollup
+
+
 def fold_summary(events: list[dict[str, Any]], manifest: dict[str, Any]) -> dict[str, Any]:
     """Fold event envelopes into a denormalized summary dict.
 
@@ -420,18 +437,6 @@ def fold_summary(events: list[dict[str, Any]], manifest: dict[str, Any]) -> dict
     }
 
     if manifest["kind"] == "optimize":
-        step_summaries = [
-            {
-                "step_index": event["step_index"],
-                "score": event["payload"]["score"],
-                "prompt_template": event["payload"]["prompt_template"],
-                "summary": event["payload"]["summary"],
-            }
-            for event in steps
-        ]
-        summary["steps"] = step_summaries
-        if step_summaries:
-            best = max(step_summaries, key=lambda item: item["score"])
-            summary["best_step"] = best
+        summary.update(_steps_rollup(steps))
 
     return summary

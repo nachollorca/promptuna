@@ -14,6 +14,7 @@ from promptuna.every_eval import export_every_eval
 from promptuna.jobs import get_jobs_root, load_job
 from promptuna.optimize import stream_optimize
 from promptuna.projects import (
+    DEFAULT_PROMPT_NAME,
     ProjectValidationError,
     build_experiment,
     resolve_dataset_path,
@@ -66,9 +67,11 @@ def main(
 def run(
     project: Annotated[str, typer.Option("--project", "-p", help="Project directory name.")],
     program: Annotated[str, typer.Option("--program", help="Program function in programs.py.")],
-    prompt: Annotated[str, typer.Option("--prompt", help="Prompt template name.")],
     examples: Annotated[str, typer.Option("--examples", help="Dataset name under data/.")],
     model: Annotated[str, typer.Option("--model", "-m", help="LM id for program execution.")],
+    prompt: Annotated[
+        str, typer.Option("--prompt", help="Prompt template name (default: prompt.jinja).")
+    ] = DEFAULT_PROMPT_NAME,
     workers: Annotated[
         int,
         typer.Option("--workers", "-w", min=1, help="Parallel trial workers."),
@@ -121,13 +124,15 @@ def run(
 def evaluate(
     project: Annotated[str, typer.Option("--project", "-p", help="Project directory name.")],
     program: Annotated[str, typer.Option("--program", help="Program function in programs.py.")],
-    prompt: Annotated[str, typer.Option("--prompt", help="Prompt template name.")],
     examples: Annotated[str, typer.Option("--examples", help="Dataset name under data/.")],
     model: Annotated[str, typer.Option("--model", "-m", help="LM id for program execution.")],
     metric: Annotated[
         list[str],
         typer.Option("--metric", "-M", help="Metric name from metrics.py (repeatable)."),
     ],
+    prompt: Annotated[
+        str, typer.Option("--prompt", help="Prompt template name (default: prompt.jinja).")
+    ] = DEFAULT_PROMPT_NAME,
     workers: Annotated[
         int,
         typer.Option("--workers", "-w", min=1, help="Parallel trial workers."),
@@ -188,7 +193,6 @@ def evaluate(
 def optimize(
     project: Annotated[str, typer.Option("--project", "-p", help="Project directory name.")],
     program: Annotated[str, typer.Option("--program", help="Program function in programs.py.")],
-    prompt: Annotated[str, typer.Option("--prompt", help="Prompt template name.")],
     examples: Annotated[str, typer.Option("--examples", help="Dataset name under data/.")],
     model: Annotated[str, typer.Option("--model", "-m", help="LM id for program execution.")],
     metric: Annotated[
@@ -200,6 +204,9 @@ def optimize(
         str,
         typer.Option("--proposer-model", help="LM id for prompt-template proposals."),
     ],
+    prompt: Annotated[
+        str, typer.Option("--prompt", help="Prompt template name (default: prompt.jinja).")
+    ] = DEFAULT_PROMPT_NAME,
     workers: Annotated[
         int,
         typer.Option("--workers", "-w", min=1, help="Parallel trial workers."),

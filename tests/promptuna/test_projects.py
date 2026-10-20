@@ -13,6 +13,7 @@ from promptuna.projects import (
     default_projects_root,
     get_projects_root,
     list_program_names,
+    list_prompt_names,
     resolve_examples,
     resolve_metrics,
     resolve_program,
@@ -113,6 +114,27 @@ def test_resolve_prompt_rejects_invalid_name(fixtures_projects_root):
 
     with pytest.raises(ProjectValidationError, match="invalid prompt name"):
         resolve_prompt_template(project_dir, "../outside")
+
+
+def test_single_root_prompt_is_listed_and_resolved(tmp_path):
+    project_dir = tmp_path / "single"
+    project_dir.mkdir()
+    (project_dir / "prompt.jinja").write_text("Hello {{ name }}", encoding="utf-8")
+    set_projects_root(tmp_path)
+
+    assert list_prompt_names(project_dir) == ["prompt"]
+    assert resolve_prompt_template(project_dir) == "Hello {{ name }}"
+
+
+def test_prompts_dir_takes_precedence_over_root_prompt(tmp_path):
+    project_dir = tmp_path / "both"
+    (project_dir / "prompts").mkdir(parents=True)
+    (project_dir / "prompts" / "baseline.jinja").write_text("multi", encoding="utf-8")
+    (project_dir / "prompt.jinja").write_text("single", encoding="utf-8")
+    set_projects_root(tmp_path)
+
+    assert list_prompt_names(project_dir) == ["baseline"]
+    assert resolve_prompt_template(project_dir, "baseline") == "multi"
 
 
 def test_resolve_examples_rejects_missing_dataset(fixtures_projects_root):
