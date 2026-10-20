@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.39.0 (2026-10-20)
+
+### Features
+
+- **structure**: Allow for single `prompt.jinja` instead of `prompts/`
+  ([`ec94781`](https://github.com/nachollorca/promptuna/commit/ec94781bbb11720c530a903b2d6535967c0ef938))
+
+### Refactoring
+
+- **jobs**: Reduce complexity of `fold_summary`
+  ([`751d879`](https://github.com/nachollorca/promptuna/commit/751d8794eb31a49bb1080b84d67a52452bf41b0e))
+
+
 ## v1.38.0 (2026-09-23)
 
 ### Bug Fixes
