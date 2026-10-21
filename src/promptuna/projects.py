@@ -97,12 +97,22 @@ def resolve_project_dir(project: str) -> Path:
     return project_dir
 
 
-def _load_project_module(project_dir: Path, module_basename: str) -> Any:
-    path = project_dir / f"{module_basename}.py"
-    if not path.is_file():
-        raise ProjectValidationError(f"{module_basename}.py not found in project")
+def _module_path(project_dir: Path, *basenames: str) -> Path | None:
+    """Return the first existing ``<basename>.py`` in ``project_dir``."""
+    for basename in basenames:
+        path = project_dir / f"{basename}.py"
+        if path.is_file():
+            return path
+    return None
 
-    module_name = f"_promptuna_project_{project_dir.name}_{module_basename}"
+
+def _load_project_module(project_dir: Path, module_basename: str, *fallbacks: str) -> Any:
+    path = _module_path(project_dir, module_basename, *fallbacks)
+    if path is None:
+        names = " or ".join(f"{name}.py" for name in (module_basename, *fallbacks))
+        raise ProjectValidationError(f"{names} not found in project")
+
+    module_name = f"_promptuna_project_{project_dir.name}_{path.stem}"
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise ProjectValidationError(f"could not load {module_basename}.py")
@@ -149,8 +159,8 @@ def _validate_metric(metric: Any, name: str) -> Metric:
 
 
 def resolve_program(project_dir: Path, name: str) -> Program:
-    """Import and validate a named program from ``programs.py``."""
-    module = _load_project_module(project_dir, "programs")
+    """Import and validate a named program from ``programs.py`` or ``program.py``."""
+    module = _load_project_module(project_dir, "programs", "program")
     program = _resolve_named_callable(module, name, kind="program")
     return _validate_program(program, name)
 
@@ -228,16 +238,15 @@ def list_project_names() -> list[str]:
 
 
 def list_program_names(project_dir: Path) -> list[str]:
-    """Return public program function names from ``programs.py``.
+    """Return public program function names from ``programs.py`` or ``program.py``.
 
     Only functions with the :class:`~promptuna.program.Program` signature are
-    listed: a ``programs.py`` may also define public helpers that fan the
-    program out, and discovery must never offer a name
-    :func:`resolve_program` would reject.
+    listed: the module may also define public helpers that fan the program out,
+    and discovery must never offer a name :func:`resolve_program` would reject.
     """
-    if not (project_dir / "programs.py").is_file():
+    if _module_path(project_dir, "programs", "program") is None:
         return []
-    module = _load_project_module(project_dir, "programs")
+    module = _load_project_module(project_dir, "programs", "program")
     return sorted(
         name
         for name, obj in inspect.getmembers(module, inspect.isfunction)

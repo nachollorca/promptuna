@@ -8,7 +8,7 @@ Each project is a subdirectory of the **projects root**:
 
 ```
 <project_name>/
-├── programs.py       # program functions (--program = function name)
+├── programs.py       # program functions (or program.py; --program = function name)
 ├── metrics.py        # ProgrammaticMetric / LLMJudgeMetric (--metric = variable name)
 ├── prompt.jinja      # single prompt (default --prompt name: "prompt")
 ├── prompts/          # or multi-prompt templates (--prompt = stem)
