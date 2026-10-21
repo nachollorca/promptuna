@@ -213,6 +213,19 @@ def test_build_catalog_skips_invalid_project_dir_names(tmp_path):
     assert catalog.projects[0].prompts == ["baseline"]
 
 
+def test_singular_program_module_is_discovered_and_resolved(tmp_path):
+    project_dir = tmp_path / "single_program"
+    project_dir.mkdir()
+    (project_dir / "program.py").write_text(
+        "def solve(prompt_template: str, model: str, **inputs):\n    return inputs\n",
+        encoding="utf-8",
+    )
+    set_projects_root(tmp_path)
+
+    assert list_program_names(project_dir) == ["solve"]
+    assert callable(resolve_program(project_dir, "solve"))
+
+
 def test_list_program_names_skips_public_non_programs(tmp_path):
     """A public fan-out helper in ``programs.py`` must not be offered as a program."""
     project_dir = tmp_path / "with_helper"

@@ -8,7 +8,7 @@ This is not where end-user projects live in production — a future `promptuna i
 
 ```
 samples/<project_name>/
-├── programs.py       # callables adhering to the Program protocol
+├── programs.py       # callables adhering to the Program protocol (or program.py)
 ├── metrics.py        # ProgrammaticMetric / LLMJudgeMetric instances
 ├── prompt.jinja      # single-prompt projects (prompt name: "prompt")
 ├── prompts/          # multi-prompt projects (instead of prompt.jinja)
@@ -20,7 +20,7 @@ samples/<project_name>/
 Use either the root `prompt.jinja` or a `prompts/` directory. When `prompts/`
 contains any `.jinja` file it wins and `prompt.jinja` is ignored.
 
-### `programs.py`
+### `programs.py` / `program.py`
 
 Each program is a Python function that:
 
