@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.40.0 (2026-10-21)
+
+### Features
+
+- **structure**: Allow for single `program.py` instead of `programs/`
+  ([`67bd34f`](https://github.com/nachollorca/promptuna/commit/67bd34fb2bc65129b1a14fc3238a09908a46564a))
+
+
 ## v1.39.0 (2026-10-20)
 
 ### Features
