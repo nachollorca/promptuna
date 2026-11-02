@@ -8,6 +8,122 @@ In the refinement loop below, promptuna offers the primitives to define metrics 
 
 For the conceptual basis see the [Whitepaper](#whitepaper).
 
+## Demo
+
+The sample is [`samples/triage_tickets`](samples/triage_tickets): route a support ticket to a team and give it a priority, knowing the customer's plan. Nothing in the prompt says what P0 vs P3 means, or which team owns what — that rubric is written down nowhere, and the optimizer has to infer it from the scores.
+
+<!-- TODO: replace with the recorded run. Upload the video in a GitHub comment/draft issue and
+     paste the user-attachments URL below. -->
+
+https://github.com/user-attachments/assets/REPLACE_WITH_VIDEO_ID
+
+<!-- TODO: what the viewer sees, step by step: the job form, the baseline score, each proposal and
+     its score, the template the optimizer converges on, where the job archive and report live. -->
+
+<details>
+<summary>The starting prompt</summary>
+
+```jinja
+Triage this support ticket: give it a priority and route it to a team.
+
+Customer plan: {{ PLAN }}
+
+Ticket:
+{{ TICKET }}
+```
+
+</details>
+
+<details>
+<summary>The program</summary>
+
+```python
+"""Program for the triage_tickets reference project."""
+
+from typing import Literal
+
+from lmdk import complete, render_template
+from pydantic import BaseModel
+
+
+class Triage(BaseModel):
+    priority: Literal["P0", "P1", "P2", "P3"]
+    team: Literal["billing", "accounts", "platform", "security", "product"]
+
+
+def v1(
+    prompt_template: str,
+    model: str,
+    plan: str,
+    ticket: str,
+    generation_kwargs: dict | None = None,
+) -> dict:
+    """Render the ticket, ask for a structured triage, return it as a dict."""
+    prompt = render_template(
+        template=prompt_template,
+        PLAN=plan,
+        TICKET=ticket.strip(),
+    )
+    response = complete(
+        model=model,
+        generation_kwargs=generation_kwargs,
+        prompt=prompt,
+        output_schema=Triage,
+    )
+    return response.output.model_dump()
+```
+
+</details>
+
+<details>
+<summary>The metrics</summary>
+
+```python
+"""Metrics for the triage_tickets reference project."""
+
+from promptuna.evaluate import Ordinal, ProgrammaticMetric, RawScore
+from promptuna.program import Example
+
+
+def _field_match(field: str):
+    def scorer(output: dict, example: Example) -> RawScore:
+        assert example.reference is not None, "triage_tickets rows require a reference"
+        got, expected = output[field], example.reference[field]
+        if got == expected:
+            return RawScore(raw=True, reason=f"{field} '{got}' matches the support lead.")
+        return RawScore(
+            raw=False, reason=f"Assigned {field} '{got}', support lead chose '{expected}'."
+        )
+
+    return scorer
+
+
+priority_match = ProgrammaticMetric(
+    name="priority_match",
+    description="Whether the assigned priority matches the support lead's choice for the ticket.",
+    scale=Ordinal(levels=[False, True]),
+    scorer=_field_match("priority"),
+)
+
+team_match = ProgrammaticMetric(
+    name="team_match",
+    description="Whether the ticket is routed to the team the support lead chose.",
+    scale=Ordinal(levels=[False, True]),
+    scorer=_field_match("team"),
+)
+```
+
+</details>
+
+<details>
+<summary>One dataset row</summary>
+
+```json
+{"inputs": {"plan": "free", "ticket": "URGENT!!! Your app is the worst. I've asked THREE TIMES for a dark mode. Add it NOW or I'm leaving."}, "reference": {"priority": "P3", "team": "product"}}
+```
+
+</details>
+
 ## The loop
 
 ```mermaid
