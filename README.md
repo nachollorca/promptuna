@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <img src="frontend/static/logo.png" alt="Promptuna logo" />
 </p>
@@ -12,10 +14,7 @@ For the conceptual basis see the [Whitepaper](#whitepaper).
 
 The sample is [`samples/triage_tickets`](samples/triage_tickets): route a support ticket to a team and give it a priority, knowing the customer's plan. Nothing in the prompt says what P0 vs P3 means, or which team owns what — that rubric is written down nowhere, and the optimizer has to infer it from the scores.
 
-<!-- TODO: replace with the recorded run. Upload the video in a GitHub comment/draft issue and
-     paste the user-attachments URL below. -->
-
-https://github.com/user-attachments/assets/REPLACE_WITH_VIDEO_ID
+https://github.com/user-attachments/assets/cb0c5967-250b-467e-adf9-b1ebea77b8fe
 
 <!-- TODO: what the viewer sees, step by step: the job form, the baseline score, each proposal and
      its score, the template the optimizer converges on, where the job archive and report live. -->
