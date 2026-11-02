@@ -10,12 +10,13 @@ First-time setup from the repository root:
 just frontend-install
 ```
 
-Run API and UI in separate terminals:
+Run API and UI together (Ctrl+C stops both):
 
 ```bash
-just server          # API → http://127.0.0.1:6969
-just frontend-dev    # UI → http://localhost:5173
+just demo             # API → http://127.0.0.1:6969, UI → http://localhost:5173
 ```
+
+Or in separate terminals, `just server` and `just frontend-dev`.
 
 Set `PUBLIC_API_URL` in `.env` (see `.env.example`) to the **API origin without a path suffix** — e.g. `http://127.0.0.1:6969`. The client appends `/api` to each request (`/api/catalog`, `/api/jobs`, …).
 

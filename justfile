@@ -52,7 +52,6 @@ notebook:
 server:
     uv run --frozen uvicorn promptuna_server.main:app --reload --port 6969
 
-
 # Frontend --------------------------------------------------------------------
 frontend-install:
     npm ci --prefix frontend
@@ -71,6 +70,10 @@ frontend-build:
 
 frontend-dev:
     npm run dev --prefix frontend
+
+# API and UI together; Ctrl+C stops both.
+[parallel]
+demo: server frontend-dev
 
 # Container image (packaged UI + API on one port) ---------------------------
 # Uses podman when available, otherwise docker. Override: CONTAINER_ENGINE=docker
