@@ -1,0 +1,32 @@
+{"inputs": {"plan": "free", "ticket": "URGENT!!! Your app is the worst. I've asked THREE TIMES for a dark mode. Add it NOW or I'm leaving."}, "reference": {"priority": "P3", "team": "product"}}
+{"inputs": {"plan": "enterprise", "ticket": "Hi team, none of our 400 users can load dashboards since 9:00 UTC, we get a 503 everywhere. Thanks for looking!"}, "reference": {"priority": "P0", "team": "platform"}}
+{"inputs": {"plan": "pro", "ticket": "I was charged twice for March. Could you look into it when you get a chance?"}, "reference": {"priority": "P1", "team": "billing"}}
+{"inputs": {"plan": "free", "ticket": "I can't log in, the password reset email never arrives."}, "reference": {"priority": "P2", "team": "accounts"}}
+{"inputs": {"plan": "pro", "ticket": "I can't log in, the password reset email never arrives. I have a client demo in an hour."}, "reference": {"priority": "P1", "team": "accounts"}}
+{"inputs": {"plan": "free", "ticket": "Hey, small thing: if I change the id in the /export URL I can download other people's files. Just FYI."}, "reference": {"priority": "P0", "team": "security"}}
+{"inputs": {"plan": "enterprise", "ticket": "We got a login notification from Brazil for our admin account. Nobody on our team is there."}, "reference": {"priority": "P0", "team": "security"}}
+{"inputs": {"plan": "pro", "ticket": "Dashboards take about 20 seconds to load since yesterday. Still usable, just slow."}, "reference": {"priority": "P2", "team": "platform"}}
+{"inputs": {"plan": "enterprise", "ticket": "Could you add an option to export reports to PDF? Our execs would love it."}, "reference": {"priority": "P3", "team": "product"}}
+{"inputs": {"plan": "pro", "ticket": "We need our VAT number added to the last three invoices for accounting."}, "reference": {"priority": "P3", "team": "billing"}}
+{"inputs": {"plan": "pro", "ticket": "Webhooks to our Slack stopped firing completely. Our on-call alerts depend on them."}, "reference": {"priority": "P1", "team": "platform"}}
+{"inputs": {"plan": "free", "ticket": "The app is down for me, the whole page is blank."}, "reference": {"priority": "P2", "team": "platform"}}
+{"inputs": {"plan": "enterprise", "ticket": "SSO through Okta fails for everyone in our org since this morning. Nobody can get in."}, "reference": {"priority": "P0", "team": "accounts"}}
+{"inputs": {"plan": "pro", "ticket": "Button labels overlap on the settings page in Safari."}, "reference": {"priority": "P3", "team": "product"}}
+{"inputs": {"plan": "free", "ticket": "How do I share a dashboard with a colleague?"}, "reference": {"priority": "P3", "team": "product"}}
+{"inputs": {"plan": "pro", "ticket": "I'd like to cancel my subscription at the end of the month."}, "reference": {"priority": "P3", "team": "billing"}}
+{"inputs": {"plan": "enterprise", "ticket": "Two-factor codes are rejected for one of our admins, she's locked out. Everyone else is fine."}, "reference": {"priority": "P1", "team": "accounts"}}
+{"inputs": {"plan": "pro", "ticket": "One of our API keys was accidentally pushed to a public GitHub repo. How do we rotate it?"}, "reference": {"priority": "P0", "team": "security"}}
+{"inputs": {"plan": "free", "ticket": "Invites to my teammate keep bouncing, he never gets the email."}, "reference": {"priority": "P2", "team": "accounts"}}
+{"inputs": {"plan": "pro", "ticket": "Charts sometimes show yesterday's numbers until I refresh the page. Refreshing fixes it."}, "reference": {"priority": "P2", "team": "platform"}}
+{"inputs": {"plan": "enterprise", "ticket": "Our renewal invoice bills 250 seats but our contract says 200."}, "reference": {"priority": "P1", "team": "billing"}}
+{"inputs": {"plan": "pro", "ticket": "I got an email asking me to confirm my password on a site that looks exactly like yours. Is that you?"}, "reference": {"priority": "P0", "team": "security"}}
+{"inputs": {"plan": "free", "ticket": "I paid for the Pro upgrade yesterday but my account still shows Free and the limits still apply."}, "reference": {"priority": "P1", "team": "billing"}}
+{"inputs": {"plan": "enterprise", "ticket": "The API returns a 500 on roughly 5% of requests. Retries succeed."}, "reference": {"priority": "P2", "team": "platform"}}
+{"inputs": {"plan": "pro", "ticket": "Is there a keyboard shortcut to duplicate a widget?"}, "reference": {"priority": "P3", "team": "product"}}
+{"inputs": {"plan": "pro", "ticket": "THIS IS UNACCEPTABLE. The font on the new dashboard is way too small, my eyes hurt."}, "reference": {"priority": "P3", "team": "product"}}
+{"inputs": {"plan": "free", "ticket": "I can't sign in with Google anymore, it says the account is not found."}, "reference": {"priority": "P2", "team": "accounts"}}
+{"inputs": {"plan": "enterprise", "ticket": "A former employee still has access to our workspace even though we removed him yesterday. He just edited a report."}, "reference": {"priority": "P0", "team": "security"}}
+{"inputs": {"plan": "pro", "ticket": "Can I get a refund for last month? I barely used the product."}, "reference": {"priority": "P3", "team": "billing"}}
+{"inputs": {"plan": "enterprise", "ticket": "Salesforce sync has failed for all our workspaces since your deploy last night. Nothing imports."}, "reference": {"priority": "P0", "team": "platform"}}
+{"inputs": {"plan": "pro", "ticket": "CSV import fails with 'unexpected error' every single time, so we can't onboard our data."}, "reference": {"priority": "P1", "team": "platform"}}
+{"inputs": {"plan": "free", "ticket": "Would love a Linux desktop app."}, "reference": {"priority": "P3", "team": "product"}}
