@@ -4,19 +4,144 @@
 
 `promptuna` evaluates and optimizes _functions that use an LM_ to accomplish a goal.
 
-In the refinement loop below, promptuna offers the primitives to define metrics that judge how well your program performs (3); the harness can then use those scores to drive automated improvements on the prompt template (4).
-
-For the conceptual basis see the [Whitepaper](#whitepaper).
-
-## The loop
+You define what "good" means as **metrics** (3); the harness uses their scores to improve the **prompt template** automatically (4).
 
 ```mermaid
 flowchart LR
-    A[1. Make a program] --> B[2. Run the program]
-    B --> C[3. Evaluate the program]
-    C --> D[4. Improve the program]
+    A[1. Make a program] --> B[2. Run]
+    B --> C[3. Evaluate]
+    C --> D[4. Improve]
     D --> B
 ```
+
+The four ingredients:
+
+- **Program** — an ordinary Python function that makes exactly one LM call, wrapped in a deterministic scaffold (render the inputs, parse or repair the output).
+- **Prompt template** — the Jinja prompt with `{{ PLACEHOLDERS }}`; the only thing the optimizer rewrites.
+- **Dataset** — JSONL rows of `inputs` plus an optional `reference` (ground truth).
+- **Metric** — a named scorer (programmatic or LLM judge) with a typed scale, saying what a good output is.
+
+For the conceptual basis see the [Whitepaper](#whitepaper).
+
+## Demo
+
+Say we have function [`triage_tickets`](samples/triage_tickets): route a support ticket to a team and give it a priority, knowing the customer's plan.
+
+https://github.com/user-attachments/assets/cb0c5967-250b-467e-adf9-b1ebea77b8fe
+
+Evaluate scores the current template on the dataset; optimize rewrites the template step by step and keeps the best-scoring one. The pieces behind the demo:
+
+<details>
+<summary>The starting prompt</summary>
+
+```jinja
+Triage this support ticket: give it a priority and route it to a team.
+
+Customer plan: {{ PLAN }}
+
+Ticket:
+{{ TICKET }}
+```
+
+</details>
+
+<details>
+<summary>The program</summary>
+
+```python
+"""Program for the triage_tickets reference project."""
+
+from typing import Literal
+
+from lmdk import complete, render_template
+from pydantic import BaseModel
+
+
+class Triage(BaseModel):
+    priority: Literal["P0", "P1", "P2", "P3"]
+    team: Literal["billing", "accounts", "platform", "security", "product"]
+
+
+def v1(
+    prompt_template: str,
+    model: str,
+    plan: str,
+    ticket: str,
+    generation_kwargs: dict | None = None,
+) -> dict:
+    """Render the ticket, ask for a structured triage, return it as a dict."""
+    prompt = render_template(
+        template=prompt_template,
+        PLAN=plan,
+        TICKET=ticket.strip(),
+    )
+    response = complete(
+        model=model,
+        generation_kwargs=generation_kwargs,
+        prompt=prompt,
+        output_schema=Triage,
+    )
+    return response.output.model_dump()
+```
+
+</details>
+
+<details>
+<summary>The metrics</summary>
+
+```python
+"""Metrics for the triage_tickets reference project."""
+
+from promptuna.evaluate import Ordinal, ProgrammaticMetric, RawScore
+from promptuna.program import Example
+
+
+def _field_match(field: str):
+    def scorer(output: dict, example: Example) -> RawScore:
+        assert example.reference is not None, "triage_tickets rows require a reference"
+        got, expected = output[field], example.reference[field]
+        if got == expected:
+            return RawScore(raw=True, reason=f"{field} '{got}' matches the support lead.")
+        return RawScore(
+            raw=False, reason=f"Assigned {field} '{got}', support lead chose '{expected}'."
+        )
+
+    return scorer
+
+
+priority_match = ProgrammaticMetric(
+    name="priority_match",
+    description="Whether the assigned priority matches the support lead's choice for the ticket.",
+    scale=Ordinal(levels=[False, True]),
+    scorer=_field_match("priority"),
+)
+
+team_match = ProgrammaticMetric(
+    name="team_match",
+    description="Whether the ticket is routed to the team the support lead chose.",
+    scale=Ordinal(levels=[False, True]),
+    scorer=_field_match("team"),
+)
+```
+
+</details>
+
+<details>
+<summary>One dataset row</summary>
+
+```json
+{
+  "inputs": {
+    "plan": "free",
+    "ticket": "URGENT!!! Your app is the worst. I've asked THREE TIMES for a dark mode. Add it NOW or I'm leaving."
+  },
+  "reference": { "priority": "P3", "team": "product" }
+}
+```
+
+</details>
+
+## The loop
 
 The loop maps directly onto the package layout:
 
@@ -100,7 +225,7 @@ This is **rubric discovery**, not epoch training. Each step is a full re-evaluat
 
 ### Replication and noise
 
-Both LM calls in the loop are stochastic, so each is replicated independently:
+LM calls in the loop are stochastic, so each is replicated independently:
 
 | Axis    | Knob                     | Effect                                                                                                                                              |
 | ------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -135,10 +260,13 @@ Holdout evaluation is the caller's responsibility (`optimize` scores the same `e
 
 Long runs with document-heavy examples can bloat proposer context (every checkpoint's template is kept; error analysis with full `rendered_prompt` blocks is attached only to the best and latest steps). The default budget is tuned for bootstrapping a good template quickly, not for dozens of exploratory steps.
 
+**Decision-model judges.** Decision models — such as TypeSafe's Jev or Fastino's GLiDER — are a recent model class that skips free-text generation: given a question over a fixed set of permitted answers, they return label probabilities plus a confidence score, at a fraction of a reasoning LLM's latency and cost. As judges they look promising: Rao and Callison-Burch ([arXiv:2609.29769](https://arxiv.org/abs/2609.29769)) find decision models often on par with flash-tier LLM rubric judges at 16–357x lower cost and 5–350x faster, though they err in the same places as LLM judges; Li et al. ([arXiv:2609.26550](https://arxiv.org/abs/2609.26550)) show a JEV-first cascade — accept confident verdicts, escalate the rest to a reasoning judge — matching or slightly beating a frontier LLM judge at ~41% of the fee where the verdict can be read off the text, and falling behind where it must be derived (math, code, logic). A `DecisionModelMetric` that escalates low-confidence verdicts to an `LLMJudgeMetric` is the natural first step.
+
 These are the highest-leverage directions—custom proposers, trajectory rendering, or outer orchestration—not built-in modes today:
 
 | Direction                                     | Rationale                                                                                                                                      |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Decision-model judges**                     | Judge with a decision model (label probabilities + confidence); escalate low-confidence verdicts to an LLM judge.                              |
 | **Plateau-triggered exploration**             | When the best score is unchanged for _k_ steps, ask for a structurally different template or branch from diverse past checkpoints.             |
 | **Trajectory summarization / sliding window** | Keep full detail for the last few steps plus the best; compress older steps to score, diff, and lesson. Reduces context growth and repetition. |
 | **Deduplicate weak examples**                 | Prefer fresh failures over the same weakest examples every step; cluster failure modes into representatives.                                   |

@@ -1,0 +1,10 @@
+{"inputs": {"plan": "free", "ticket": "URGENT!!! Your app is the worst. I've asked THREE TIMES for a dark mode. Add it NOW or I'm leaving."}, "reference": {"priority": "P3", "team": "product"}}
+{"inputs": {"plan": "enterprise", "ticket": "Hi team, none of our 400 users can load dashboards since 9:00 UTC, we get a 503 everywhere. Thanks for looking!"}, "reference": {"priority": "P0", "team": "platform"}}
+{"inputs": {"plan": "pro", "ticket": "I was charged twice for March. Could you look into it when you get a chance?"}, "reference": {"priority": "P1", "team": "billing"}}
+{"inputs": {"plan": "free", "ticket": "I can't log in, the password reset email never arrives."}, "reference": {"priority": "P2", "team": "accounts"}}
+{"inputs": {"plan": "free", "ticket": "Hey, small thing: if I change the id in the /export URL I can download other people's files. Just FYI."}, "reference": {"priority": "P0", "team": "security"}}
+{"inputs": {"plan": "pro", "ticket": "We need our VAT number added to the last three invoices for accounting."}, "reference": {"priority": "P3", "team": "billing"}}
+{"inputs": {"plan": "enterprise", "ticket": "SSO through Okta fails for everyone in our org since this morning. Nobody can get in."}, "reference": {"priority": "P0", "team": "accounts"}}
+{"inputs": {"plan": "pro", "ticket": "Charts sometimes show yesterday's numbers until I refresh the page. Refreshing fixes it."}, "reference": {"priority": "P2", "team": "platform"}}
+{"inputs": {"plan": "free", "ticket": "I paid for the Pro upgrade yesterday but my account still shows Free and the limits still apply."}, "reference": {"priority": "P1", "team": "billing"}}
+{"inputs": {"plan": "enterprise", "ticket": "A former employee still has access to our workspace even though we removed him yesterday. He just edited a report."}, "reference": {"priority": "P0", "team": "security"}}
