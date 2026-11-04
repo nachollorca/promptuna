@@ -1,23 +1,35 @@
-
-
 <p align="center">
   <img src="frontend/static/logo.png" alt="Promptuna logo" />
 </p>
 
 `promptuna` evaluates and optimizes _functions that use an LM_ to accomplish a goal.
 
-In the refinement loop below, promptuna offers the primitives to define metrics that judge how well your program performs (3); the harness can then use those scores to drive automated improvements on the prompt template (4).
+You define what "good" means as **metrics** (3); the harness uses their scores to improve the **prompt template** automatically (4).
+
+```mermaid
+flowchart LR
+    A[1. Make a program] --> B[2. Run]
+    B --> C[3. Evaluate]
+    C --> D[4. Improve]
+    D --> B
+```
+
+The four ingredients:
+
+- **Program** — an ordinary Python function that makes exactly one LM call, wrapped in a deterministic scaffold (render the inputs, parse or repair the output).
+- **Prompt template** — the Jinja prompt with `{{ PLACEHOLDERS }}`; the only thing the optimizer rewrites.
+- **Dataset** — JSONL rows of `inputs` plus an optional `reference` (ground truth).
+- **Metric** — a named scorer (programmatic or LLM judge) with a typed scale, saying what a good output is.
 
 For the conceptual basis see the [Whitepaper](#whitepaper).
 
 ## Demo
 
-The sample is [`samples/triage_tickets`](samples/triage_tickets): route a support ticket to a team and give it a priority, knowing the customer's plan. Nothing in the prompt says what P0 vs P3 means, or which team owns what — that rubric is written down nowhere, and the optimizer has to infer it from the scores.
+Say we have function [`triage_tickets`](samples/triage_tickets): route a support ticket to a team and give it a priority, knowing the customer's plan.
 
 https://github.com/user-attachments/assets/cb0c5967-250b-467e-adf9-b1ebea77b8fe
 
-<!-- TODO: what the viewer sees, step by step: the job form, the baseline score, each proposal and
-     its score, the template the optimizer converges on, where the job archive and report live. -->
+Evaluate scores the current template on the dataset; optimize rewrites the template step by step and keeps the best-scoring one. The pieces behind the demo:
 
 <details>
 <summary>The starting prompt</summary>
@@ -118,20 +130,18 @@ team_match = ProgrammaticMetric(
 <summary>One dataset row</summary>
 
 ```json
-{"inputs": {"plan": "free", "ticket": "URGENT!!! Your app is the worst. I've asked THREE TIMES for a dark mode. Add it NOW or I'm leaving."}, "reference": {"priority": "P3", "team": "product"}}
+{
+  "inputs": {
+    "plan": "free",
+    "ticket": "URGENT!!! Your app is the worst. I've asked THREE TIMES for a dark mode. Add it NOW or I'm leaving."
+  },
+  "reference": { "priority": "P3", "team": "product" }
+}
 ```
 
 </details>
 
 ## The loop
-
-```mermaid
-flowchart LR
-    A[1. Make a program] --> B[2. Run the program]
-    B --> C[3. Evaluate the program]
-    C --> D[4. Improve the program]
-    D --> B
-```
 
 The loop maps directly onto the package layout:
 
