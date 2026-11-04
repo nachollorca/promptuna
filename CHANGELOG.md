@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v1.41.0 (2026-11-04)
+
+### Chores
+
+- **deployment**: Use justfile parallel to do front and backend in one go
+  ([`65872eb`](https://github.com/nachollorca/promptuna/commit/65872ebf618f2bd536093dc98ecf291506ce9add))
+
+### Documentation
+
+- **readme**: Add video link for demo in README
+  ([`71b5a42`](https://github.com/nachollorca/promptuna/commit/71b5a421ab989e9d5b23af316dd289d779489f7b))
+
+- **readme**: Prepare demo
+  ([`79ba38d`](https://github.com/nachollorca/promptuna/commit/79ba38da33a62b9a615076a78f69b666ce799666))
+
+- **readme**: Reorder
+  ([`e9ad561`](https://github.com/nachollorca/promptuna/commit/e9ad5614985cb8fa403145267357608cd0ec4e25))
+
+- **readme**: Tighten opening, add ingredient glossary, move demo video up
+  ([`6c89d59`](https://github.com/nachollorca/promptuna/commit/6c89d59d44da1d6b1c4a229c2b70b8e40c3f30fe))
+
+### Features
+
+- **samples**: Add triage_tickets sample
+  ([`ea40564`](https://github.com/nachollorca/promptuna/commit/ea405649168dc0399fceb97520031ea851e6d237))
+
+
 ## v1.40.0 (2026-10-21)
 
 ### Features
