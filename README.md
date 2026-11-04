@@ -225,7 +225,7 @@ This is **rubric discovery**, not epoch training. Each step is a full re-evaluat
 
 ### Replication and noise
 
-Both LM calls in the loop are stochastic, so each is replicated independently:
+LM calls in the loop are stochastic, so each is replicated independently:
 
 | Axis    | Knob                     | Effect                                                                                                                                              |
 | ------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -260,10 +260,13 @@ Holdout evaluation is the caller's responsibility (`optimize` scores the same `e
 
 Long runs with document-heavy examples can bloat proposer context (every checkpoint's template is kept; error analysis with full `rendered_prompt` blocks is attached only to the best and latest steps). The default budget is tuned for bootstrapping a good template quickly, not for dozens of exploratory steps.
 
+**Decision-model judges.** Decision models — such as TypeSafe's Jev or Fastino's GLiDER — are a recent model class that skips free-text generation: given a question over a fixed set of permitted answers, they return label probabilities plus a confidence score, at a fraction of a reasoning LLM's latency and cost. As judges they look promising: Rao and Callison-Burch ([arXiv:2609.29769](https://arxiv.org/abs/2609.29769)) find decision models often on par with flash-tier LLM rubric judges at 16–357x lower cost and 5–350x faster, though they err in the same places as LLM judges; Li et al. ([arXiv:2609.26550](https://arxiv.org/abs/2609.26550)) show a JEV-first cascade — accept confident verdicts, escalate the rest to a reasoning judge — matching or slightly beating a frontier LLM judge at ~41% of the fee where the verdict can be read off the text, and falling behind where it must be derived (math, code, logic). A `DecisionModelMetric` that escalates low-confidence verdicts to an `LLMJudgeMetric` is the natural first step.
+
 These are the highest-leverage directions—custom proposers, trajectory rendering, or outer orchestration—not built-in modes today:
 
 | Direction                                     | Rationale                                                                                                                                      |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Decision-model judges**                     | Judge with a decision model (label probabilities + confidence); escalate low-confidence verdicts to an LLM judge.                              |
 | **Plateau-triggered exploration**             | When the best score is unchanged for _k_ steps, ask for a structurally different template or branch from diverse past checkpoints.             |
 | **Trajectory summarization / sliding window** | Keep full detail for the last few steps plus the best; compress older steps to score, diff, and lesson. Reduces context growth and repetition. |
 | **Deduplicate weak examples**                 | Prefer fresh failures over the same weakest examples every step; cluster failure modes into representatives.                                   |
